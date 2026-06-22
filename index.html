@@ -1670,10 +1670,9 @@ function confirmarFechamento() {
 //  ESTADO
 // ═══════════════════════════════════════════════
 let catalogo = LS.get('caixa_catalogo', [
-  { id: 1, emoji: '🍬', nome: 'Caldo de Cana 500ml', desc: '500 ml', preco: 2.50 },
+  { id: 1, emoji: '🥤', nome: 'Caldo de Cana 500ml', desc: '500 ml', preco: 2.50 },
   { id: 2, emoji: '🥤', nome: 'Caldo de Cana 700ml', desc: '700 ml', preco: 3.00 },
   { id: 3, emoji: '🍗', nome: 'Coxinha',              desc: 'Frango', preco: 2.50 },
-  { id: 4, emoji: '🍦', nome: 'Sorvete',              desc: '',       preco: 2.00 },
 ]);
 let estoque   = LS.get('caixa_estoque',   {});
 // historico: cada pedido tem { num, data:'YYYY-MM-DD', hora, total, itens:[{id,nome,qtd,subtotal}] }

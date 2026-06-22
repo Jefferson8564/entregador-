@@ -4,6 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Caixa</title>
+
+<!-- Open Graph (preview no WhatsApp, Telegram, etc.) -->
+<meta property="og:title" content="Caixa do Damablon">
+<meta property="og:description" content="Sistema de caixa e ponto de venda">
+<meta property="og:image" content="https://jefferson8564.github.io/Damablon/icon-512.png">
+<meta property="og:url" content="https://jefferson8564.github.io/Damablon/">
+<meta property="og:type" content="website">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#43a047">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Caixa">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -2446,6 +2464,49 @@ function toast(msg) {
 atualizarBadge();
 render();
 verificarSessao();
+
+// ─── PWA: registrar Service Worker com auto-update ───────────
+// Quando uma nova versão do SW é detectada (estado "waiting" ou "installed"),
+// envia skipWaiting para ele ativar imediatamente e recarrega a página.
+// O usuário nunca fica preso numa versão velha.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+
+      // Força update assim que a página carrega (checa se há novo SW disponível)
+      reg.update();
+
+      function promptUpdate(worker) {
+        worker.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      // Caso 1: SW já está "waiting" quando a página abre
+      if (reg.waiting) {
+        promptUpdate(reg.waiting);
+      }
+
+      // Caso 2: novo SW entra em "installing" durante a sessão
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            promptUpdate(newWorker);
+          }
+        });
+      });
+
+    }).catch(err => console.warn('[SW] Falha ao registrar:', err));
+
+    // Quando o SW ativa (após skipWaiting), recarrega para pegar versão nova
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  });
+}
 </script>
 </body>
 </html>

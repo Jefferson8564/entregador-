@@ -137,12 +137,14 @@
   /* ADICIONAR ITEM */
   .add-section { padding: 6px 10px 12px; }
   .add-section h3 { font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 8px; }
-  .add-form { display: flex; gap: 8px; align-items: center; }
-  .add-form input { flex: 1; background: #2c2c2c; border: 1.5px solid #444; border-radius: 10px; color: #fff; padding: 10px 12px; font-size: .88rem; outline: none; }
+  .add-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .add-form input { flex: 1 1 120px; min-width: 0; background: #2c2c2c; border: 1.5px solid #444; border-radius: 10px; color: #fff; padding: 10px 12px; font-size: .88rem; outline: none; }
   .add-form input:focus { border-color: #43a047; }
   .add-form input::placeholder { color: #666; }
-  .add-form input.preco-input { width: 100px; flex: none; }
-  .add-form button { background: #43a047; color: #fff; border: none; border-radius: 10px; padding: 10px 14px; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .add-form input.preco-input { width: 100px; flex: 0 1 100px; }
+  .add-form button { flex: 1 1 100%; background: #43a047; color: #fff; border: none; border-radius: 10px; padding: 10px 14px; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .novo-emoji-btn { flex: 0 0 44px; width: 44px; height: 44px; background: #1a1a1a; border: 1.5px solid #444; border-radius: 10px; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+  .novo-emoji-btn:active { border-color: #43a047; }
 
   /* RODAPÉ */
   .rodape { position: fixed; bottom: 0; left: 0; right: 0; background: #2a2a2a; padding: 12px 16px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #3a3a3a; }
@@ -170,6 +172,18 @@
   .modal-fin h2 { font-size: 1.1rem; margin-bottom: 14px; }
   .modal-fin-resumo { background: #1a1a1a; border-radius: 10px; padding: 12px; margin-bottom: 14px; font-size: .88rem; line-height: 2; }
   .modal-fin-total { font-size: 1.5rem; font-weight: 800; text-align: center; color: #43a047; margin-bottom: 14px; }
+  .pgto-topo-bar {
+    display: flex; align-items: center;
+    background: #111; border-radius: 12px; padding: 12px 16px;
+    margin-bottom: 2px;
+  }
+  .pgto-topo-lado { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .pgto-topo-lado.direito { align-items: flex-end; }
+  .pgto-topo-label { font-size: .65rem; text-transform: uppercase; letter-spacing: 1px; color: #666; font-weight: 700; }
+  .pgto-topo-valor { font-size: 1.4rem; font-weight: 900; color: #43a047; }
+  .pgto-topo-valor.troco { color: #81c784; }
+  .pgto-topo-valor.troco.negativo { color: #ef5350; }
+  .pgto-topo-sep { width: 1px; height: 36px; background: #2a2a2a; margin: 0 16px; }
   /* ── PAGAMENTO ── */
   .pgto-wrap { background: #1a1a1a; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
   .pgto-label { font-size: .72rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
@@ -541,6 +555,18 @@
   .abate-acoes .cancela { background: #444; color: #ccc; }
   .abate-acoes .confirma { background: #43a047; color: #fff; }
 
+  .hist-pgto-resumo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 16px 8px;
+  }
+  .hist-pgto-card {
+    background: #1a1a1a; border-radius: 12px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .hist-pgto-card-label { font-size: .72rem; color: #666; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
+  .hist-pgto-card-val   { font-size: 1.1rem; font-weight: 800; color: #43a047; }
   .hist-dia-cabecalho {
     display: flex;
     justify-content: space-between;
@@ -948,13 +974,9 @@
   <div class="tela-header">
     <button class="voltar-btn" onclick="fecharHistorico()">‹</button>
     <h2>Histórico do Dia</h2>
-    <span class="tela-sub" id="hist-data"></span>
+    <span id="hstat-qtd" style="margin-left:auto;font-size:.82rem;font-weight:700;color:#81c784;white-space:nowrap"></span>
   </div>
-  <div class="hist-stats">
-    <div class="hstat"><div class="hstat-label">Total</div><div class="hstat-val verde" id="hstat-total">R$ 0,00</div></div>
-    <div class="hstat"><div class="hstat-label">Pedidos</div><div class="hstat-val branco" id="hstat-qtd">0</div></div>
-    <div class="hstat"><div class="hstat-label">Ticket médio</div><div class="hstat-val amarelo" id="hstat-ticket">R$ 0,00</div></div>
-  </div>
+  <div class="hist-pgto-resumo" id="hist-pgto-resumo"></div>
   <div class="hist-lista" id="hist-lista"></div>
 </div>
 
@@ -967,10 +989,12 @@
   <div class="ger-add-section">
     <h3>+ Adicionar item</h3>
     <div class="add-form">
+      <button type="button" class="novo-emoji-btn" id="novo-emoji-btn" onclick="toggleNovoEmojiGrade()">🛒</button>
       <input type="text" id="novo-nome" placeholder="Nome" />
       <input type="text" id="novo-preco" placeholder="R$ 0,00" class="preco-input" inputmode="decimal" />
       <button onclick="adicionarNovoItem()">+ Add</button>
     </div>
+    <div class="edit-emoji-grade" id="novo-emoji-grade" style="display:none; margin-top:8px;"></div>
   </div>
   <div class="ger-lista" id="ger-lista"></div>
 </div>
@@ -1058,10 +1082,20 @@
 <div class="modal-fin" id="modal-fin">
   <h2>Confirmar Pedido</h2>
   <div class="modal-fin-resumo" id="fin-resumo"></div>
-  <div class="modal-fin-total" id="fin-total"></div>
 
   <div class="pgto-wrap">
-    <div class="pgto-label">💳 Pagamento</div>
+    <div class="pgto-topo-bar">
+      <div class="pgto-topo-lado">
+        <div class="pgto-topo-label">Total</div>
+        <div class="pgto-topo-valor" id="fin-total"></div>
+      </div>
+      <div class="pgto-topo-sep"></div>
+      <div class="pgto-topo-lado direito">
+        <div class="pgto-topo-label">Troco</div>
+        <div class="pgto-topo-valor troco" id="fin-troco">R$ 0,00</div>
+      </div>
+    </div>
+    <div class="pgto-label" style="margin-top:14px">💳 Pagamento</div>
     <div id="pgto-linhas"></div>
   </div>
 
@@ -1286,32 +1320,89 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ═══════════════════════════════════════════════
-//  PERSISTÊNCIA — localStorage
+//  CONFIGURAÇÃO SUPABASE
+//  ⚠️  Substitua os valores abaixo pelos do seu projeto
 // ═══════════════════════════════════════════════
+const SUPABASE_URL = 'https://arzwivafesujfacyrqcv.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyendpdmFmZXN1amZhY3lycWN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjY0MTksImV4cCI6MjA5Nzc0MjQxOX0.aBTR_raOe7pZkwAWZpnRgWoL0VkCjbTsgto-agp6fO4';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// LS local: fallback para campos não críticos (sessão, preferências)
 const LS = {
   get(k, def) { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : def; } catch { return def; } },
   set(k, v)   { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
 
-function salvar() {
-  LS.set('caixa_catalogo',  catalogo);
-  LS.set('caixa_estoque',   estoque);
-  LS.set('caixa_historico', historico);
-  LS.set('caixa_nextId',    nextId);
-  LS.set('caixa_numPedido', numPedido);
+// ─── SINCRONIZAÇÃO COM SUPABASE ───────────────
+// Todas as funções são async. A UI chama salvar() e aguarda com await.
+// Em caso de erro de rede, os dados ficam no estado em memória
+// e o usuário vê um toast de aviso.
+
+async function salvar() {
+  try {
+    await Promise.all([
+      upsertConfig('catalogo',  catalogo),
+      upsertConfig('estoque',   estoque),
+      upsertConfig('historico', historico),
+      upsertConfig('nextId',    nextId),
+      upsertConfig('numPedido', numPedido),
+    ]);
+  } catch(e) {
+    console.error('[Supabase] salvar:', e);
+    toast('⚠️ Erro ao salvar no servidor');
+  }
+}
+
+async function upsertConfig(chave, valor) {
+  const { error } = await sb.from('caixa_config').upsert({ chave, valor: JSON.stringify(valor) }, { onConflict: 'chave' });
+  if (error) throw error;
+}
+
+async function getConfig(chave, def) {
+  const { data, error } = await sb.from('caixa_config').select('valor').eq('chave', chave).single();
+  if (error || !data) return def;
+  try { return JSON.parse(data.valor); } catch { return def; }
+}
+
+// Carrega todo o estado do Supabase (chamado no init)
+async function carregarEstado() {
+  const [cat, est, hist, nid, nped, ops, sdono, sess, ufech] = await Promise.all([
+    getConfig('catalogo',  [{ id:1,emoji:'🥤',nome:'Caldo de Cana 500ml',desc:'500 ml',preco:2.50 },
+                             { id:2,emoji:'🥤',nome:'Caldo de Cana 700ml',desc:'700 ml',preco:3.00 },
+                             { id:3,emoji:'🍗',nome:'Coxinha',             desc:'Frango',preco:2.50 }]),
+    getConfig('estoque',   {}),
+    getConfig('historico', []),
+    getConfig('nextId',    100),
+    getConfig('numPedido', 1),
+    getConfig('operadores', []),
+    getConfig('senha_dono', '8564'),
+    getConfig('sessao',    null),
+    getConfig('ultimo_fechamento', null),
+  ]);
+  catalogo   = cat;
+  estoque    = Object.fromEntries(Object.entries(est).map(([k,v]) => [Number(k), v]));
+  historico  = hist;
+  nextId     = nid;
+  numPedido  = nped;
+  operadores = ops;
+  senhaDono  = sdono;
+  sessaoCaixa = sess;
+  _ultimoFechamento = ufech;
 }
 
 // ═══════════════════════════════════════════════
 //  CAIXA — OPERADORES CADASTRADOS & SENHA DO DONO
 // ═══════════════════════════════════════════════
-let operadores  = LS.get('caixa_operadores', []); // [{ nome, senha }]
-let senhaDono   = LS.get('caixa_senha_dono', '8564');
-let operadorSelecionado = null; // nome do operador escolhido na lista de login
+let operadores  = []; // carregado async
+let senhaDono   = '8564';
+let operadorSelecionado = null;
 
-function salvarOperadores() { LS.set('caixa_operadores', operadores); }
-function salvarSenhaDono()  { LS.set('caixa_senha_dono', senhaDono); }
+async function salvarOperadores() { await upsertConfig('operadores', operadores).catch(()=>{}); }
+async function salvarSenhaDono()  { await upsertConfig('senha_dono', senhaDono).catch(()=>{}); }
 
 function renderOpLista() {
   const lista = document.getElementById('op-lista');
@@ -1358,7 +1449,7 @@ function abrirCadastroOperador() {
 function fecharCadastroOperador() {
   document.getElementById('modal-cadastro-op').classList.remove('aberto');
 }
-function confirmarCadastroOperador() {
+async function confirmarCadastroOperador() {
   const nome   = document.getElementById('cad-op-nome').value.trim();
   const senha  = document.getElementById('cad-op-senha').value.trim();
   const senha2 = document.getElementById('cad-op-senha2').value.trim();
@@ -1368,7 +1459,7 @@ function confirmarCadastroOperador() {
   if (senha !== senha2) return toast('As senhas não coincidem');
 
   operadores.push({ nome, senha });
-  salvarOperadores();
+  await salvarOperadores();
   fecharCadastroOperador();
   renderOpLista();
   toast(`✅ Operador "${nome}" cadastrado!`);
@@ -1420,9 +1511,9 @@ function abrirExcluirOperador() {
 function fecharExcluirOperador() {
   document.getElementById('modal-excluir-op').classList.remove('aberto');
 }
-function excluirOperador(nome) {
+async function excluirOperador(nome) {
   operadores = operadores.filter(o => o.nome !== nome);
-  salvarOperadores();
+  await salvarOperadores();
   if (operadorSelecionado === nome) operadorSelecionado = null;
   renderOpLista();
   abrirExcluirOperador();
@@ -1438,13 +1529,13 @@ function abrirTrocarSenhaDono() {
 function fecharTrocarSenhaDono() {
   document.getElementById('modal-trocar-senha-dono').classList.remove('aberto');
 }
-function confirmarTrocarSenhaDono() {
+async function confirmarTrocarSenhaDono() {
   const nova  = document.getElementById('nova-senha-dono').value.trim();
   const nova2 = document.getElementById('nova-senha-dono2').value.trim();
   if (!nova) return toast('Digite a nova senha');
   if (nova !== nova2) return toast('As senhas não coincidem');
   senhaDono = nova;
-  salvarSenhaDono();
+  await salvarSenhaDono();
   fecharTrocarSenhaDono();
   toast('✅ Senha do dono atualizada!');
 }
@@ -1452,10 +1543,13 @@ function confirmarTrocarSenhaDono() {
 // ═══════════════════════════════════════════════
 //  CAIXA — SESSÃO
 // ═══════════════════════════════════════════════
-let sessaoCaixa = LS.get('caixa_sessao', null);
+let sessaoCaixa = null; // carregado async em carregarEstado()
+let _ultimoFechamento = null;
 // sessaoCaixa: { operador, abertura: ISO, fundo, pedidosAntes: number }
 
-function salvarSessao() { LS.set('caixa_sessao', sessaoCaixa); }
+async function salvarSessao() {
+  try { await upsertConfig('sessao', sessaoCaixa); } catch(e) { console.error(e); }
+}
 
 function verificarSessao() {
   if (sessaoCaixa) {
@@ -1486,7 +1580,7 @@ function renderFundoChips() {
 }
 
 function mostrarUltimoCaixa() {
-  const ultimo = LS.get('caixa_ultimo_fechamento', null);
+  const ultimo = _ultimoFechamento;
   const infoEl = document.getElementById('login-ultimo-info');
   if (!ultimo) { infoEl.style.display = 'none'; return; }
   infoEl.style.display = 'block';
@@ -1514,7 +1608,7 @@ function voltarParaEtapaOperador() {
   document.getElementById('login-etapa-1').style.display = 'block';
 }
 
-function abrirCaixa() {
+async function abrirCaixa() {
   if (!operadorSelecionado) return toast('Selecione um operador (ou cadastre um novo)');
   const op = operadores.find(o => o.nome === operadorSelecionado);
   if (!op) return toast('Operador inválido');
@@ -1529,7 +1623,7 @@ function abrirCaixa() {
     fundo,
     pedidosAntes: historico.length
   };
-  salvarSessao();
+  await salvarSessao();
   aplicarSessaoAberta();
   document.getElementById('tela-login').classList.remove('aberto');
   document.getElementById('login-etapa-2').style.display = 'none';
@@ -1613,7 +1707,7 @@ function fecharModalFechamento() {
   document.getElementById('overlay-fechamento').classList.remove('aberto');
 }
 
-function confirmarFechamento() {
+async function confirmarFechamento() {
   const s = sessaoCaixa;
   if (!s) return;
 
@@ -1632,16 +1726,17 @@ function confirmarFechamento() {
     qtdPedidos: pedidosTurno.length,
     obs: document.getElementById('fech-obs').value.trim()
   };
-  LS.set('caixa_ultimo_fechamento', fechamento);
+  _ultimoFechamento = fechamento;
+  await upsertConfig('ultimo_fechamento', fechamento).catch(()=>{});
 
-  // guardar histórico de fechamentos
-  const historicoCaixas = LS.get('caixa_historico_caixas', []);
+  // guardar histórico de fechamentos no Supabase
+  const historicoCaixas = await getConfig('historico_caixas', []);
   historicoCaixas.push(fechamento);
-  LS.set('caixa_historico_caixas', historicoCaixas);
+  await upsertConfig('historico_caixas', historicoCaixas).catch(()=>{});
 
   // limpar sessão
   sessaoCaixa = null;
-  salvarSessao();
+  await salvarSessao();
 
   fecharModalFechamento();
   const nomeEl = document.getElementById('header-nome');
@@ -1667,21 +1762,13 @@ function confirmarFechamento() {
 }
 
 // ═══════════════════════════════════════════════
-//  ESTADO
+//  ESTADO — inicializado em carregarEstado() (async)
 // ═══════════════════════════════════════════════
-let catalogo = LS.get('caixa_catalogo', [
-  { id: 1, emoji: '🥤', nome: 'Caldo de Cana 500ml', desc: '500 ml', preco: 2.50 },
-  { id: 2, emoji: '🥤', nome: 'Caldo de Cana 700ml', desc: '700 ml', preco: 3.00 },
-  { id: 3, emoji: '🍗', nome: 'Coxinha',              desc: 'Frango', preco: 2.50 },
-]);
-let estoque   = LS.get('caixa_estoque',   {});
-// historico: cada pedido tem { num, data:'YYYY-MM-DD', hora, total, itens:[{id,nome,qtd,subtotal}] }
-let historico = LS.get('caixa_historico', []);
-let nextId    = LS.get('caixa_nextId',    100);
-let numPedido = LS.get('caixa_numPedido', 1);
-
-// converter chaves numéricas (JSON serializa objetos com chave string)
-estoque = Object.fromEntries(Object.entries(estoque).map(([k,v]) => [Number(k), v]));
+let catalogo  = [];
+let estoque   = {};
+let historico = [];
+let nextId    = 100;
+let numPedido = 1;
 
 let qtds = {};
 let editandoId = null;
@@ -1802,11 +1889,36 @@ function renderPgtoLinhas() {
     inp.type = 'number'; inp.inputMode = 'decimal';
     inp.className = 'pgto-valor-input';
     inp.placeholder = 'R$ 0,00';
+
+    // Para pix/crédito/débito: pré-preenche com o restante se ainda não tem valor
+    if (!linha.valor && linha.tipo !== 'dinheiro') {
+      const outrosPagos = pgtoLinhas.reduce((s, l, i) => i !== idx ? s + (parseFloat(l.valor)||0) : s, 0);
+      const restante = Math.max(0, totalAtual - outrosPagos);
+      if (restante > 0) {
+        linha.valor = restante.toFixed(2);
+      }
+    }
     inp.value = linha.valor || '';
+
     inp.oninput = () => {
       pgtoLinhas[idx].valor = inp.value;
       atualizarTroco(idx);
+      atualizarTrocoGlobal();
       if (linha.tipo === 'dinheiro') renderChips(idx, inp);
+    };
+
+    // Ao tocar no campo: zera para o usuário digitar do zero
+    inp.onfocus = () => {
+      inp.value = '';
+      pgtoLinhas[idx].valor = '';
+      atualizarTrocoGlobal();
+      if (linha.tipo === 'dinheiro') renderChips(idx, inp);
+    };
+    inp.onblur = () => {
+      // Se saiu sem digitar nada, restaura o valor que estava
+      if (inp.value === '' && linha.valor !== '') {
+        // ficou vazio mesmo — ok, mantém vazio
+      }
     };
 
     row.appendChild(metBtn);
@@ -1822,26 +1934,19 @@ function renderPgtoLinhas() {
       inp.addEventListener('input', () => renderChips(idx, inp));
     }
 
-    // troco / restante abaixo (só dinheiro, ou quando há valor)
-    const trocoRow = document.createElement('div');
-    trocoRow.className = 'pgto-troco-row';
-    trocoRow.id = `troco-row-${idx}`;
-    trocoRow.innerHTML = `<span id="troco-label-${idx}">Troco</span><strong id="troco-val-${idx}"></strong>`;
-    div.appendChild(trocoRow);
+
 
     cont.appendChild(div);
 
     // render inicial dos chips (precisa estar no DOM)
     if (linha.tipo === 'dinheiro') renderChips(idx, inp);
 
-    // foca no input de linha nova
-    if (idx === pgtoLinhas.length - 1 && !linha.valor) {
-      setTimeout(() => inp.focus(), 80);
-    }
+    // foco removido — teclado só abre se o usuário tocar no campo
   });
 
-  // recalcula todos os trocos
+  // recalcula todos os trocos (inclui valores pré-preenchidos de pix/crédito/débito)
   pgtoLinhas.forEach((_, i) => atualizarTroco(i));
+  atualizarTrocoGlobal();
 }
 
 function renderChips(idx, inp) {
@@ -1930,51 +2035,41 @@ function renderChips(idx, inp) {
       inp.value = valor;
       pgtoLinhas[idx].valor = String(valor);
       renderChips(idx, inp);
-      atualizarTroco(idx);
+      atualizarTrocoGlobal();
     };
     chipsDiv.appendChild(chip);
   });
 }
 
-function atualizarTroco(idx) {
-  const linha = pgtoLinhas[idx];
-  if (!linha) return;
-  const v = parseFloat(linha.valor) || 0;
-  const row = document.getElementById(`troco-row-${idx}`);
-  const lbl = document.getElementById(`troco-label-${idx}`);
-  const val = document.getElementById(`troco-val-${idx}`);
-  if (!row || !val) return;
-
-  if (v <= 0) { row.classList.remove('visivel'); return; }
-
-  // quanto falta dos outros métodos pagar
-  const outrosPagos = pgtoLinhas.reduce((s, l, i) => i !== idx ? s + (parseFloat(l.valor)||0) : s, 0);
-  const restante = Math.max(0, totalAtual - outrosPagos);
-
-  if (linha.tipo === 'dinheiro') {
-    const troco = v - restante;
-    row.classList.add('visivel');
-    if (troco < 0) {
-      lbl.textContent = 'Falta';
-      val.textContent = fmt(Math.abs(troco));
-      val.className = 'negativo';
-    } else {
-      lbl.textContent = 'Troco';
-      val.textContent = fmt(troco);
-      val.className = '';
-    }
-  } else {
-    // outros métodos: só mostra se valor > restante
-    const excesso = v - restante;
-    if (excesso > 0.001) {
-      row.classList.add('visivel');
-      lbl.textContent = 'Excesso';
-      val.textContent = fmt(excesso);
-      val.className = '';
-    } else {
-      row.classList.remove('visivel');
-    }
+function atualizarTrocoGlobal() {
+  const trocoEl = document.getElementById('fin-troco');
+  if (!trocoEl) return;
+  const pago = totalPago();
+  if (pago <= 0) {
+    trocoEl.textContent = 'R$ 0,00';
+    trocoEl.className = 'pgto-topo-valor troco';
+    return;
   }
+  const diff = pago - totalAtual;
+  if (diff > 0.001) {
+    // só conta como troco se a linha de dinheiro cobrir o excesso
+    const dinheiroPago = pgtoLinhas.filter(l => l.tipo === 'dinheiro').reduce((s,l) => s + (parseFloat(l.valor)||0), 0);
+    const outrosPagos  = pgtoLinhas.filter(l => l.tipo !== 'dinheiro').reduce((s,l) => s + (parseFloat(l.valor)||0), 0);
+    const trocoReal = dinheiroPago - Math.max(0, totalAtual - outrosPagos);
+    trocoEl.textContent = trocoReal > 0.001 ? fmt(trocoReal) : 'R$ 0,00';
+    trocoEl.className = 'pgto-topo-valor troco';
+  } else if (diff < -0.001) {
+    trocoEl.textContent = '− ' + fmt(Math.abs(diff));
+    trocoEl.className = 'pgto-topo-valor troco negativo';
+  } else {
+    trocoEl.textContent = 'R$ 0,00';
+    trocoEl.className = 'pgto-topo-valor troco';
+  }
+}
+
+function atualizarTroco(idx) {
+  // troco calculado na barra do topo
+  atualizarTrocoGlobal();
 }
 
 // ─── Sheet "como pagar o restante?" ───
@@ -2045,6 +2140,7 @@ function abrirFinalizar() {
   // começa com 1 linha de dinheiro vazia
   pgtoLinhas = [{ tipo: 'dinheiro', valor: '' }];
   renderPgtoLinhas();
+  atualizarTrocoGlobal();
 
   document.getElementById('modal-fin').classList.add('aberto');
   document.getElementById('overlay-fin').classList.add('aberto');
@@ -2056,12 +2152,13 @@ function fecharFinalizar() {
 }
 
 function confirmarPedido() {
-  if (!pgtoLinhas.length || !pgtoLinhas[0].valor) return toast('Digite o valor recebido');
-
   const pago = totalPago();
-  const falta = totalAtual - pago;
 
-  // se falta dinheiro → abre sheet perguntando como pagar o restante
+  // nenhum valor informado
+  if (pago <= 0) return toast('Digite o valor recebido');
+
+  // valor menor que o total
+  const falta = totalAtual - pago;
   if (falta > 0.001) {
     abrirSheetRestante(falta);
     return;
@@ -2071,7 +2168,7 @@ function confirmarPedido() {
   _finalizarPedido();
 }
 
-function _finalizarPedido() {
+async function _finalizarPedido() {
   const itens = catalogo.filter(c=>(qtds[c.id]||0)>0).map(item=>({
     id: item.id,
     nome: item.emoji+' '+item.nome,
@@ -2100,7 +2197,7 @@ function _finalizarPedido() {
   });
   const corte = new Date(); corte.setDate(corte.getDate()-7);
   historico = historico.filter(p => p.data >= corte.toISOString().slice(0,10));
-  salvar();
+  await salvar();
   atualizarBadge();
   fecharFinalizar();
   qtds = {};
@@ -2141,10 +2238,42 @@ function abrirHistorico() {
   // stats de hoje
   const ph = pedidosHoje();
   const totalDia = ph.reduce((s,p)=>s+p.total,0);
-  const ticket   = ph.length ? totalDia/ph.length : 0;
-  document.getElementById('hstat-total').textContent  = fmt(totalDia);
-  document.getElementById('hstat-qtd').textContent    = ph.length;
-  document.getElementById('hstat-ticket').textContent = fmt(ticket);
+
+  // qtd no cabeçalho
+  const qtdEl = document.getElementById('hstat-qtd');
+  qtdEl.textContent = ph.length > 0 ? `${ph.length} pedido${ph.length>1?'s':''}` : '';
+
+  // divisão por método de pagamento (hoje)
+  const metodosTotais = { credito: 0, debito: 0, pix: 0, dinheiro: 0 };
+  ph.forEach(p => {
+    if (p.pagamentos && p.pagamentos.length) {
+      p.pagamentos.forEach(pg => {
+        if (metodosTotais[pg.tipo] !== undefined) metodosTotais[pg.tipo] += pg.valor;
+        else metodosTotais[pg.tipo] = (metodosTotais[pg.tipo]||0) + pg.valor;
+      });
+    } else if (p.pagamento) {
+      metodosTotais[p.pagamento] = (metodosTotais[p.pagamento]||0) + p.total;
+    }
+  });
+
+  const metodoInfo = {
+    credito:  { label: 'Crédito',  icon: '💳' },
+    debito:   { label: 'Débito',   icon: '🏦' },
+    pix:      { label: 'Pix',      icon: '📱' },
+    dinheiro: { label: 'Dinheiro', icon: '💵' },
+  };
+
+  const resumoEl = document.getElementById('hist-pgto-resumo');
+  resumoEl.innerHTML = '';
+
+  // cards por método (sempre mostra os 4)
+  Object.entries(metodoInfo).forEach(([tipo, info]) => {
+    const val = metodosTotais[tipo] || 0;
+    const card = document.createElement('div');
+    card.className = 'hist-pgto-card';
+    card.innerHTML = `<div class="hist-pgto-card-label">${info.icon} ${info.label}</div><div class="hist-pgto-card-val">${fmt(val)}</div>`;
+    resumoEl.appendChild(card);
+  });
 
   // agrupar por data (últimos 7 dias, mais recente primeiro)
   const diasMap = {};
@@ -2237,16 +2366,41 @@ function togglePedido(data, num) {
 function abrirGerenciar()  { renderGerenciar(); document.getElementById('tela-ger').classList.add('aberto'); }
 function fecharGerenciar() { document.getElementById('tela-ger').classList.remove('aberto'); abrirConfig(); }
 
-function adicionarNovoItem() {
+async function adicionarNovoItem() {
   const nome = document.getElementById('novo-nome').value.trim();
   const preco = parseFloat(document.getElementById('novo-preco').value.replace(',','.'));
   if (!nome) return toast('Informe o nome');
   if (isNaN(preco)||preco<0) return toast('Preço inválido');
-  catalogo.push({ id: nextId++, emoji:'🛒', nome, desc:'', preco });
+  catalogo.push({ id: nextId++, emoji:emojiNovoItem, nome, desc:'', preco });
   document.getElementById('novo-nome').value='';
   document.getElementById('novo-preco').value='';
-  salvar(); render(); renderGerenciar();
+  emojiNovoItem='🛒';
+  document.getElementById('novo-emoji-btn').textContent=emojiNovoItem;
+  document.getElementById('novo-emoji-grade').style.display='none';
+  await salvar(); render(); renderGerenciar();
   toast(`"${nome}" adicionado!`);
+}
+
+let emojiNovoItem='🛒';
+function toggleNovoEmojiGrade() {
+  const grade=document.getElementById('novo-emoji-grade');
+  const aberta = grade.style.display!=='none';
+  if (aberta) { grade.style.display='none'; return; }
+  grade.innerHTML='';
+  EMOJIS.forEach(emo=>{
+    const btn=document.createElement('button');
+    btn.className='edit-emoji-opcao'+(emo===emojiNovoItem?' selecionado':'');
+    btn.textContent=emo;
+    btn.onclick=()=>{
+      emojiNovoItem=emo;
+      document.getElementById('novo-emoji-btn').textContent=emo;
+      grade.querySelectorAll('.edit-emoji-opcao').forEach(b=>b.classList.remove('selecionado'));
+      btn.classList.add('selecionado');
+      grade.style.display='none';
+    };
+    grade.appendChild(btn);
+  });
+  grade.style.display='grid';
 }
 
 function renderGerenciar() {
@@ -2269,11 +2423,11 @@ function renderGerenciar() {
   });
 }
 
-function removerItem(id) {
+async function removerItem(id) {
   const item=catalogo.find(c=>c.id===id); if(!item) return;
   catalogo=catalogo.filter(c=>c.id!==id);
   delete qtds[id]; delete estoque[id];
-  salvar(); render(); renderGerenciar();
+  await salvar(); render(); renderGerenciar();
   toast(`"${item.nome}" removido`);
 }
 
@@ -2298,14 +2452,14 @@ function abrirEditarItem(id) {
   document.getElementById('overlay-edit').classList.add('aberto');
 }
 function fecharEditarItem() { document.getElementById('overlay-edit').classList.remove('aberto'); editandoItemId=null; }
-function salvarEdicaoItem() {
+async function salvarEdicaoItem() {
   const nome=document.getElementById('edit-nome').value.trim();
   const preco=parseFloat(document.getElementById('edit-preco').value.replace(',','.'));
   if(!nome) return toast('Informe o nome');
   if(isNaN(preco)||preco<0) return toast('Preço inválido');
   const item=catalogo.find(c=>c.id===editandoItemId); if(!item) return;
   item.nome=nome; item.preco=preco; item.emoji=emojiSelecionado;
-  fecharEditarItem(); salvar(); render(); renderGerenciar();
+  fecharEditarItem(); await salvar(); render(); renderGerenciar();
   toast('Item atualizado!');
 }
 
@@ -2350,19 +2504,19 @@ function renderConfEstoque() {
   });
 }
 
-function definirEstoque(id) {
+async function definirEstoque(id) {
   const v=parseInt(document.getElementById('einp-'+id).value);
   if(isNaN(v)||v<0) return toast('Quantidade inválida');
-  estoque[id]=v; salvar(); render(); renderConfEstoque();
+  estoque[id]=v; await salvar(); render(); renderConfEstoque();
   toast('Estoque definido!');
 }
-function abaterManual(id,qtd) {
+async function abaterManual(id,qtd) {
   if(estoque[id]===undefined||estoque[id]===null) return toast('Defina o estoque primeiro');
-  estoque[id]=Math.max(0,estoque[id]-qtd); salvar(); render(); renderConfEstoque();
+  estoque[id]=Math.max(0,estoque[id]-qtd); await salvar(); render(); renderConfEstoque();
   toast('Abatido!');
 }
-function limparControle(id) {
-  delete estoque[id]; salvar(); render(); renderConfEstoque();
+async function limparControle(id) {
+  delete estoque[id]; await salvar(); render(); renderConfEstoque();
   toast('Controle de estoque removido');
 }
 
@@ -2402,13 +2556,13 @@ function renderEstoquePainel() {
   });
 }
 
-function abaterRapido(id,qtd) {
+async function abaterRapido(id,qtd) {
   if(estoque[id]===undefined||estoque[id]===null) return;
-  estoque[id]=Math.max(0,estoque[id]-qtd); salvar(); render(); renderEstoquePainel();
+  estoque[id]=Math.max(0,estoque[id]-qtd); await salvar(); render(); renderEstoquePainel();
   toast(`Abatido ${qtd} un.`);
 }
-function zerarEstoque(id) {
-  estoque[id]=0; salvar(); render(); renderEstoquePainel();
+async function zerarEstoque(id) {
+  estoque[id]=0; await salvar(); render(); renderEstoquePainel();
   toast('Estoque zerado');
 }
 
@@ -2443,12 +2597,12 @@ function selecionarAbatePedido(num,el) {
   el.classList.add('selecionado'); abatePedidoNum=num;
 }
 function fecharAbate() { document.getElementById('overlay-abate').classList.remove('aberto'); abateItemId=null; abatePedidoNum=null; }
-function confirmarAbate() {
+async function confirmarAbate() {
   if(!abatePedidoNum) return toast('Selecione um pedido');
   const pedido=historico.find(p=>p.num===abatePedidoNum); if(!pedido) return;
   const ip=pedido.itens.find(i=>i.id===abateItemId); if(!ip) return;
   estoque[abateItemId]=Math.max(0,(estoque[abateItemId]||0)-ip.qtd);
-  fecharAbate(); salvar(); render(); renderEstoquePainel();
+  fecharAbate(); await salvar(); render(); renderEstoquePainel();
   toast(`Abatido ${ip.qtd} un. do Pedido #${abatePedidoNum}`);
 }
 
@@ -2460,9 +2614,54 @@ function toast(msg) {
 }
 
 // ─── INIT ───
-atualizarBadge();
-render();
-verificarSessao();
+(async () => {
+  // Mostra indicador de carregamento
+  document.body.insertAdjacentHTML('beforeend',
+    `<div id="splash-load" style="
+      position:fixed;inset:0;background:#1a1a1a;z-index:9999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+      <div style="font-size:2.5rem">🛒</div>
+      <div style="color:#81c784;font-weight:700;font-size:1rem">Carregando dados…</div>
+      <div style="width:180px;height:4px;background:#2c2c2c;border-radius:99px;overflow:hidden">
+        <div id="splash-bar" style="height:100%;width:0%;background:#43a047;transition:width .4s ease;border-radius:99px"></div>
+      </div>
+    </div>`);
+
+  // Checa se as credenciais foram configuradas
+  if (SUPABASE_URL.includes('SEU_PROJETO') || SUPABASE_KEY.includes('SUA_ANON_KEY')) {
+    document.getElementById('splash-load').innerHTML = `
+      <div style="padding:32px;text-align:center;max-width:340px">
+        <div style="font-size:2.5rem;margin-bottom:12px">⚙️</div>
+        <div style="color:#ef5350;font-weight:800;font-size:1.1rem;margin-bottom:8px">Configure o Supabase</div>
+        <div style="color:#aaa;font-size:.85rem;line-height:1.7">
+          Edite o arquivo <strong style="color:#fff">index.html</strong> e substitua:<br><br>
+          <code style="background:#2c2c2c;padding:4px 8px;border-radius:6px;font-size:.8rem">SUPABASE_URL</code><br>
+          <code style="background:#2c2c2c;padding:4px 8px;border-radius:6px;font-size:.8rem">SUPABASE_KEY</code><br><br>
+          com os valores do seu projeto em<br>
+          <strong style="color:#81c784">supabase.com → Settings → API</strong>
+        </div>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('splash-bar').style.width = '30%';
+
+  try {
+    await carregarEstado();
+    document.getElementById('splash-bar').style.width = '90%';
+  } catch(e) {
+    console.error('[Supabase] carregarEstado:', e);
+    toast('⚠️ Erro ao conectar ao Supabase. Verifique a URL e a chave.');
+  }
+
+  document.getElementById('splash-bar').style.width = '100%';
+  await new Promise(r => setTimeout(r, 300));
+  document.getElementById('splash-load').remove();
+
+  atualizarBadge();
+  render();
+  verificarSessao();
+})();
 
 // ─── PWA: registrar Service Worker com auto-update ───────────
 // Quando uma nova versão do SW é detectada (estado "waiting" ou "installed"),

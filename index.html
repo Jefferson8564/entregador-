@@ -1331,31 +1331,29 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// LS local: fallback para campos não críticos (sessão, preferências)
+// LS local: tudo que é operacional do dia a dia mora aqui.
+// O Supabase só é tocado para: cardápio, operadores/senha (login) e fechamento de caixa.
 const LS = {
   get(k, def) { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : def; } catch { return def; } },
   set(k, v)   { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 };
 
-// ─── SINCRONIZAÇÃO COM SUPABASE ───────────────
-// Todas as funções são async. A UI chama salvar() e aguarda com await.
-// Em caso de erro de rede, os dados ficam no estado em memória
-// e o usuário vê um toast de aviso.
-
-async function salvar() {
-  try {
-    await Promise.all([
-      upsertConfig('catalogo',  catalogo),
-      upsertConfig('estoque',   estoque),
-      upsertConfig('historico', historico),
-      upsertConfig('nextId',    nextId),
-      upsertConfig('numPedido', numPedido),
-    ]);
-  } catch(e) {
-    console.error('[Supabase] salvar:', e);
-    toast('⚠️ Erro ao salvar no servidor');
-  }
+// ─── PERSISTÊNCIA LOCAL (sem internet) ────────
+// Tudo que muda durante o expediente (vendas, estoque, edição de cardápio em memória,
+// contadores, sessão) grava só no localStorage. Instantâneo, nunca falha por falta de rede.
+function salvarLocal() {
+  LS.set('catalogo',  catalogo);
+  LS.set('estoque',   estoque);
+  LS.set('historico', historico);
+  LS.set('nextId',    nextId);
+  LS.set('numPedido', numPedido);
 }
+
+// Mantido por compatibilidade com chamadas existentes pelo código (await salvar()).
+async function salvar() { salvarLocal(); }
+
+// ─── SINCRONIZAÇÃO COM SUPABASE (só 3 coisas) ─
+// 1) cardápio  2) operadores + senha do dono (login)  3) fechamentos de caixa
 
 async function upsertConfig(chave, valor) {
   const { error } = await sb.from('caixa_config').upsert({ chave, valor: JSON.stringify(valor) }, { onConflict: 'chave' });
@@ -1368,30 +1366,66 @@ async function getConfig(chave, def) {
   try { return JSON.parse(data.valor); } catch { return def; }
 }
 
-// Carrega todo o estado do Supabase (chamado no init)
-async function carregarEstado() {
-  const [cat, est, hist, nid, nped, ops, sdono, sess, ufech] = await Promise.all([
-    getConfig('catalogo',  [{ id:1,emoji:'🥤',nome:'Caldo de Cana 500ml',desc:'500 ml',preco:2.50 },
-                             { id:2,emoji:'🥤',nome:'Caldo de Cana 700ml',desc:'700 ml',preco:3.00 },
-                             { id:3,emoji:'🍗',nome:'Coxinha',             desc:'Frango',preco:2.50 }]),
-    getConfig('estoque',   {}),
-    getConfig('historico', []),
-    getConfig('nextId',    100),
-    getConfig('numPedido', 1),
+// Cardápio: editado pelo dono em "Gerenciar Itens" → precisa ir pra nuvem
+// (compartilhado entre dispositivos/apps). Falha de rede não derruba a edição local.
+async function salvarCardapioNuvem() {
+  try { await upsertConfig('catalogo', catalogo); }
+  catch(e) { console.error('[Supabase] salvarCardapioNuvem:', e); toast('⚠️ Cardápio salvo localmente, mas não sincronizou com a nuvem'); }
+}
+
+async function salvarOperadores() {
+  LS.set('operadores', operadores);
+  try { await upsertConfig('operadores', operadores); }
+  catch(e) { console.error('[Supabase] salvarOperadores:', e); toast('⚠️ Operador salvo localmente, mas não sincronizou com a nuvem'); }
+}
+async function salvarSenhaDono() {
+  LS.set('senha_dono', senhaDono);
+  try { await upsertConfig('senha_dono', senhaDono); }
+  catch(e) { console.error('[Supabase] salvarSenhaDono:', e); toast('⚠️ Senha salva localmente, mas não sincronizou com a nuvem'); }
+}
+
+// Carrega o estado: cardápio e operadores/senha vêm da nuvem (1ª coisa ao abrir o app);
+// tudo o mais (estoque, histórico, contadores, sessão) vem do localStorage.
+// Carrega tudo do localStorage. A nuvem NÃO é tocada aqui — só é tocada
+// no momento de abrir o caixa (baixa tudo) e fechar o caixa (envia tudo e limpa).
+function carregarEstado() {
+  estoque    = Object.fromEntries(Object.entries(LS.get('estoque', {})).map(([k,v]) => [Number(k), v]));
+  historico  = LS.get('historico', []);
+  nextId     = LS.get('nextId', 100);
+  numPedido  = LS.get('numPedido', 1);
+  sessaoCaixa = LS.get('sessao', null);
+  catalogo   = LS.get('catalogo', []);
+  operadores = LS.get('operadores', []);
+  senhaDono  = LS.get('senha_dono', '8564');
+  _ultimoFechamento = LS.get('ultimo_fechamento', null);
+}
+
+// Limpa tudo do localStorage (chamado após o fechamento de caixa confirmado na nuvem).
+// No dia seguinte, abrirCaixa() vai baixar tudo de novo da nuvem.
+function limparEstadoLocal() {
+  ['catalogo','estoque','historico','nextId','numPedido','operadores','senha_dono','sessao','ultimo_fechamento']
+    .forEach(k => localStorage.removeItem(k));
+  catalogo = []; estoque = {}; historico = []; nextId = 100; numPedido = 1;
+  operadores = []; senhaDono = '8564'; sessaoCaixa = null; _ultimoFechamento = null;
+}
+
+// Busca cardápio, operadores/senha e estoque da nuvem. Lança erro se falhar
+// (usado para BLOQUEAR a abertura do caixa sem internet).
+async function baixarTudoDaNuvem() {
+  const [cat, ops, sdono, est] = await Promise.all([
+    getConfig('catalogo',   []),
     getConfig('operadores', []),
     getConfig('senha_dono', '8564'),
-    getConfig('sessao',    null),
-    getConfig('ultimo_fechamento', null),
+    getConfig('estoque',    {}),
   ]);
   catalogo   = cat;
-  estoque    = Object.fromEntries(Object.entries(est).map(([k,v]) => [Number(k), v]));
-  historico  = hist;
-  nextId     = nid;
-  numPedido  = nped;
   operadores = ops;
   senhaDono  = sdono;
-  sessaoCaixa = sess;
-  _ultimoFechamento = ufech;
+  estoque    = Object.fromEntries(Object.entries(est).map(([k,v]) => [Number(k), v]));
+  LS.set('catalogo', catalogo);
+  LS.set('operadores', operadores);
+  LS.set('senha_dono', senhaDono);
+  LS.set('estoque', estoque);
 }
 
 // ═══════════════════════════════════════════════
@@ -1400,9 +1434,6 @@ async function carregarEstado() {
 let operadores  = []; // carregado async
 let senhaDono   = '8564';
 let operadorSelecionado = null;
-
-async function salvarOperadores() { await upsertConfig('operadores', operadores).catch(()=>{}); }
-async function salvarSenhaDono()  { await upsertConfig('senha_dono', senhaDono).catch(()=>{}); }
 
 function renderOpLista() {
   const lista = document.getElementById('op-lista');
@@ -1548,18 +1579,51 @@ let _ultimoFechamento = null;
 // sessaoCaixa: { operador, abertura: ISO, fundo, pedidosAntes: number }
 
 async function salvarSessao() {
-  try { await upsertConfig('sessao', sessaoCaixa); } catch(e) { console.error(e); }
+  LS.set('sessao', sessaoCaixa);
 }
 
-function verificarSessao() {
+async function verificarSessao() {
   if (sessaoCaixa) {
     aplicarSessaoAberta();
-  } else {
+    return;
+  }
+  // Sem sessão aberta = vai abrir o caixa agora. Precisa de internet pra
+  // baixar cardápio, operadores e estoque atualizados antes de liberar o login.
+  mostrarBloqueioCarregando();
+  try {
+    await baixarTudoDaNuvem();
+    esconderBloqueioCarregando();
     document.getElementById('tela-login').classList.add('aberto');
     renderOpLista();
     renderFundoChips();
     mostrarUltimoCaixa();
+  } catch(e) {
+    console.error('[Supabase] verificarSessao:', e);
+    mostrarBloqueioCarregando('⚠️ Sem internet. Conecte-se para abrir o caixa.', true);
   }
+}
+
+function mostrarBloqueioCarregando(msg, comBotaoTentar) {
+  let el = document.getElementById('bloqueio-carregando');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'bloqueio-carregando';
+    el.style = 'position:fixed;inset:0;background:#1a1a1a;z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center';
+    document.body.appendChild(el);
+  }
+  if (!msg) {
+    el.innerHTML = `<div style="font-size:2.5rem">☁️</div><div style="color:#81c784;font-weight:700;font-size:1rem">Baixando dados do dia…</div>`;
+  } else {
+    el.innerHTML = `
+      <div style="font-size:2.5rem">📡</div>
+      <div style="color:#ef5350;font-weight:800;font-size:1rem">${msg}</div>
+      ${comBotaoTentar ? `<button onclick="verificarSessao()" style="background:#43a047;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:.9rem;font-weight:700">Tentar de novo</button>` : ''}`;
+  }
+  el.style.display = 'flex';
+}
+function esconderBloqueioCarregando() {
+  const el = document.getElementById('bloqueio-carregando');
+  if (el) el.style.display = 'none';
 }
 
 function renderFundoChips() {
@@ -1715,7 +1779,18 @@ async function confirmarFechamento() {
   const totalVendido = pedidosTurno.reduce((a, p) => a + p.total, 0);
   const agora = new Date();
 
-  // salvar registro do fechamento
+  // detalhamento por forma de pagamento (mesma lógica usada no histórico/relatório)
+  const metodosTotais = { credito: 0, debito: 0, pix: 0, dinheiro: 0 };
+  pedidosTurno.forEach(p => {
+    if (p.pagamentos && p.pagamentos.length) {
+      p.pagamentos.forEach(pg => {
+        metodosTotais[pg.tipo] = (metodosTotais[pg.tipo]||0) + pg.valor;
+      });
+    } else if (p.pagamento) {
+      metodosTotais[p.pagamento] = (metodosTotais[p.pagamento]||0) + p.total;
+    }
+  });
+
   const fechamento = {
     operador: s.operador,
     abertura: s.abertura,
@@ -1724,21 +1799,47 @@ async function confirmarFechamento() {
     fundo: s.fundo,
     totalVendido,
     qtdPedidos: pedidosTurno.length,
+    dinheiro: metodosTotais.dinheiro,
+    pix:      metodosTotais.pix,
+    credito:  metodosTotais.credito,
+    debito:   metodosTotais.debito,
     obs: document.getElementById('fech-obs').value.trim()
   };
+
+  // Envio para a nuvem é OBRIGATÓRIO para fechar: registro do fechamento +
+  // estoque atualizado (amanhã o app vai baixar tudo de novo do zero).
+  const btn = document.querySelector('#overlay-fechamento .confirmar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const { error: e1 } = await sb.from('fechamentos_caixa').insert({
+      operador:       fechamento.operador,
+      abertura:       fechamento.abertura,
+      fechamento:     fechamento.fechamento,
+      fundo:          fechamento.fundo,
+      total_vendido:  fechamento.totalVendido,
+      qtd_pedidos:    fechamento.qtdPedidos,
+      dinheiro:       fechamento.dinheiro,
+      pix:            fechamento.pix,
+      credito:        fechamento.credito,
+      debito:         fechamento.debito,
+      obs:            fechamento.obs,
+    });
+    if (e1) throw e1;
+    await upsertConfig('estoque', estoque);
+  } catch(e) {
+    console.error('[Supabase] confirmarFechamento:', e);
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar Fechamento'; }
+    toast('⚠️ Sem internet — não foi possível fechar o caixa. Tente novamente.');
+    return;
+  }
+
   _ultimoFechamento = fechamento;
-  await upsertConfig('ultimo_fechamento', fechamento).catch(()=>{});
-
-  // guardar histórico de fechamentos no Supabase
-  const historicoCaixas = await getConfig('historico_caixas', []);
-  historicoCaixas.push(fechamento);
-  await upsertConfig('historico_caixas', historicoCaixas).catch(()=>{});
-
-  // limpar sessão
-  sessaoCaixa = null;
-  await salvarSessao();
-
   fecharModalFechamento();
+
+  // Fechamento confirmado na nuvem: agora limpa TUDO do local.
+  // Amanhã, ao abrir o caixa, tudo será baixado de novo da nuvem.
+  limparEstadoLocal();
+
   const nomeEl = document.getElementById('header-nome');
   const infoEl = document.getElementById('header-info');
   nomeEl.textContent = 'Caixa';
@@ -1748,16 +1849,13 @@ async function confirmarFechamento() {
 
   toast(`🔒 Caixa fechado. Total: ${fmt(totalVendido)}`);
 
-  // abrir login para próximo operador
+  // abrir login para próximo operador (vai baixar tudo de novo da nuvem)
   setTimeout(() => {
     operadorSelecionado = null;
-    renderOpLista();
-    renderFundoChips();
-    mostrarUltimoCaixa();
     document.getElementById('login-senha').value    = '';
     document.getElementById('login-fundo').value    = '';
     document.getElementById('login-senha-wrap').style.display = 'none';
-    document.getElementById('tela-login').classList.add('aberto');
+    verificarSessao();
   }, 1200);
 }
 
@@ -2377,8 +2475,9 @@ async function adicionarNovoItem() {
   emojiNovoItem='🛒';
   document.getElementById('novo-emoji-btn').textContent=emojiNovoItem;
   document.getElementById('novo-emoji-grade').style.display='none';
-  await salvar(); render(); renderGerenciar();
+  salvarLocal(); render(); renderGerenciar();
   toast(`"${nome}" adicionado!`);
+  await salvarCardapioNuvem();
 }
 
 let emojiNovoItem='🛒';
@@ -2427,8 +2526,9 @@ async function removerItem(id) {
   const item=catalogo.find(c=>c.id===id); if(!item) return;
   catalogo=catalogo.filter(c=>c.id!==id);
   delete qtds[id]; delete estoque[id];
-  await salvar(); render(); renderGerenciar();
+  salvarLocal(); render(); renderGerenciar();
   toast(`"${item.nome}" removido`);
+  await salvarCardapioNuvem();
 }
 
 // ─── EDITAR ITEM ───
@@ -2459,8 +2559,9 @@ async function salvarEdicaoItem() {
   if(isNaN(preco)||preco<0) return toast('Preço inválido');
   const item=catalogo.find(c=>c.id===editandoItemId); if(!item) return;
   item.nome=nome; item.preco=preco; item.emoji=emojiSelecionado;
-  fecharEditarItem(); await salvar(); render(); renderGerenciar();
+  fecharEditarItem(); salvarLocal(); render(); renderGerenciar();
   toast('Item atualizado!');
+  await salvarCardapioNuvem();
 }
 
 // ═══════════════════════════════════════════════
@@ -2645,15 +2746,7 @@ function toast(msg) {
   }
 
   document.getElementById('splash-bar').style.width = '30%';
-
-  try {
-    await carregarEstado();
-    document.getElementById('splash-bar').style.width = '90%';
-  } catch(e) {
-    console.error('[Supabase] carregarEstado:', e);
-    toast('⚠️ Erro ao conectar ao Supabase. Verifique a URL e a chave.');
-  }
-
+  carregarEstado();
   document.getElementById('splash-bar').style.width = '100%';
   await new Promise(r => setTimeout(r, 300));
   document.getElementById('splash-load').remove();

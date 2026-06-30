@@ -6,8 +6,8 @@
 <title>Entregador • O Rei da Coxinha 🍗</title>
 <meta name="theme-color" content="#0a0a0b">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -20,9 +20,14 @@
 html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(--text);position:fixed;inset:0;}
 
 #map{position:fixed;inset:0;width:100%;height:100%;z-index:1;background:#1a1a1a;}
-.leaflet-control-attribution{font-size:9px;background:rgba(0,0,0,0.5)!important;color:#888!important;}
-.leaflet-control-attribution a{color:#aaa!important;}
-.leaflet-control-zoom{display:none;}
+.maplibregl-ctrl-attrib{font-size:9px;background:rgba(0,0,0,0.5)!important;color:#888!important;}
+.maplibregl-ctrl-attrib a{color:#aaa!important;}
+.maplibregl-ctrl-bottom-right,.maplibregl-ctrl-top-right,.maplibregl-ctrl-bottom-left{display:none!important;}
+
+#marcadorEntregador{font-size:32px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6));transform-origin:center center;transition:transform 0.15s linear;}
+
+#btnRecenter{position:fixed;right:14px;bottom:max(110px, calc(env(safe-area-inset-bottom) + 110px));z-index:35;width:46px;height:46px;border-radius:50%;background:rgba(10,10,11,0.85);backdrop-filter:blur(8px);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--text2);cursor:pointer;}
+#btnRecenter.ativo{color:var(--amber);border-color:rgba(245,158,11,0.4);}
 
 #loadingOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 #loadingOverlay .e{font-size:48px;animation:floatIcon 1.6s ease-in-out infinite;}
@@ -70,6 +75,8 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 
 <div id="gpsBadge"><div class="dot-live" id="dotGps"></div><span id="gpsTexto">Buscando GPS...</span></div>
 
+<div id="btnRecenter">🧭</div>
+
 <div id="fab">
   🍗
   <div id="fabBadge" class="oculto">0</div>
@@ -93,23 +100,89 @@ const SUPABASE_URL = "https://vpeyqgijajywgswmezlh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwZXlxZ2lqYWp5d2dzd21lemxoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNTM1MDIsImV4cCI6MjA4NjgyOTUwMn0.LA5Cbof7IKWAA7l8YbCuPzANpCy0rX_Dro4l9fcDgoQ";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ===== MAPA FULLSCREEN ===== */
-let map = null, marker = null, watchId = null;
+/* ===== MAPA FULLSCREEN 3D (estilo Waze) ===== */
+let map = null, watchId = null;
 let centralizouUmaVez = false;
+let seguindoCamera = true; // quando true, câmera acompanha o entregador automaticamente
+let bearingAtual = 0;
+
+// Estilo de mapa escuro gratuito (CARTO) — sem precisar de chave de API
+const MAP_STYLE = {
+  version: 8,
+  sources: {
+    'carto-dark': {
+      type: 'raster',
+      tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap © CARTO'
+    }
+  },
+  layers: [{ id:'carto-dark-layer', type:'raster', source:'carto-dark', minzoom:0, maxzoom:20 }]
+};
 
 function initMap(lat, lng){
-  map = L.map('map', { zoomControl:false, attributionControl:true }).setView([lat,lng], 17);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(map);
-  const icon = L.divIcon({ html:'<div style="font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">🛵</div>', className:'', iconSize:[34,34], iconAnchor:[17,17] });
-  marker = L.marker([lat,lng], { icon }).addTo(map);
-  document.getElementById('loadingOverlay').style.display = 'none';
+  map = new maplibregl.Map({
+    container: 'map',
+    style: MAP_STYLE,
+    center: [lng, lat],
+    zoom: 17.5,
+    pitch: 60,          // inclinação da câmera (estilo Waze)
+    bearing: 0,
+    attributionControl: true,
+    dragRotate: true,
+    touchPitch: true
+  });
+
+  map.on('load', ()=>{
+    const el = document.createElement('div');
+    el.id = 'marcadorEntregador';
+    el.textContent = '🛵';
+    window._marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat([lng, lat]).addTo(map);
+    document.getElementById('loadingOverlay').style.display = 'none';
+  });
+
+  // se o usuário arrastar o mapa manualmente, para de seguir a câmera automaticamente
+  map.on('dragstart', ()=>{ seguindoCamera = false; atualizarBtnRecenter(); });
 }
 
-function atualizarPosicao(lat, lng){
-  if(!map){ initMap(lat, lng); return; }
-  marker.setLatLng([lat, lng]);
-  if(!centralizouUmaVez){ map.setView([lat,lng], 17); centralizouUmaVez = true; }
+function atualizarBtnRecenter(){
+  document.getElementById('btnRecenter').classList.toggle('ativo', seguindoCamera);
 }
+
+function atualizarPosicao(lat, lng, heading){
+  if(!map){ initMap(lat, lng); return; }
+  if(window._marker) window._marker.setLngLat([lng, lat]);
+
+  // gira o ícone do entregador conforme a direção do movimento
+  if(heading != null && !isNaN(heading)){
+    bearingAtual = heading;
+    const el = document.getElementById('marcadorEntregador');
+    if(el) el.style.transform = `rotate(${heading}deg)`;
+  }
+
+  if(!centralizouUmaVez){
+    map.jumpTo({ center:[lng, lat], zoom:17.5, pitch:60 });
+    centralizouUmaVez = true;
+  } else if(seguindoCamera){
+    // câmera segue o entregador, levemente deslocada pra deixar a posição mais embaixo na tela
+    map.easeTo({
+      center: [lng, lat],
+      bearing: heading != null && !isNaN(heading) ? heading : map.getBearing(),
+      pitch: 60,
+      duration: 800,
+      easing: t => t
+    });
+  }
+}
+
+document.getElementById('btnRecenter').addEventListener('click', ()=>{
+  seguindoCamera = true;
+  atualizarBtnRecenter();
+  if(map && window._marker){
+    const ll = window._marker.getLngLat();
+    map.easeTo({ center: ll, zoom:17.5, pitch:60, bearing: bearingAtual, duration: 600 });
+  }
+});
 
 function iniciarGPS(){
   if(!navigator.geolocation){
@@ -120,7 +193,7 @@ function iniciarGPS(){
   }
   watchId = navigator.geolocation.watchPosition((pos)=>{
     const { latitude, longitude, accuracy, speed, heading } = pos.coords;
-    atualizarPosicao(latitude, longitude);
+    atualizarPosicao(latitude, longitude, heading);
     document.getElementById('dotGps').classList.remove('off');
     document.getElementById('gpsTexto').textContent = 'GPS ativo • ±' + Math.round(accuracy) + 'm';
     enviarGPS(latitude, longitude, accuracy, speed, heading);
@@ -163,6 +236,7 @@ posicionarInicial();
 
 function comecarDrag(x, y){
   dragging = true; moved = false;
+  _dragStartX = x; _dragStartY = y;
   const rect = fab.getBoundingClientRect();
   offsetX = x - rect.left;
   offsetY = y - rect.top;
@@ -171,9 +245,14 @@ function comecarDrag(x, y){
   fab.style.left = rect.left + 'px';
   fab.style.top = rect.top + 'px';
 }
+let _dragStartX = 0, _dragStartY = 0;
 function moverDrag(x, y){
   if(!dragging) return;
-  moved = true;
+  if(!moved){
+    const dist = Math.hypot(x - _dragStartX, y - _dragStartY);
+    if(dist < 8) return; // ignora tremor do dedo, só conta como arraste de verdade
+    moved = true;
+  }
   let nx = x - offsetX;
   let ny = y - offsetY;
   const w = fab.offsetWidth, h = fab.offsetHeight;
@@ -254,6 +333,7 @@ async function carregarPedidos(){
 
 /* ===== INIT ===== */
 window.addEventListener('load', ()=>{
+  atualizarBtnRecenter();
   iniciarGPS();
 });
 </script>

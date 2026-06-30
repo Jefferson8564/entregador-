@@ -24,10 +24,36 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 .maplibregl-ctrl-attrib a{color:#aaa!important;}
 .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-top-right,.maplibregl-ctrl-bottom-left{display:none!important;}
 
-#marcadorEntregador{font-size:32px;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6));transform-origin:center center;transition:transform 0.15s linear;}
+#marcadorEntregador{font-size:38px;filter:drop-shadow(0 6px 10px rgba(0,0,0,0.7)) drop-shadow(0 2px 3px rgba(0,0,0,0.5));transform-origin:center 70%;transition:transform 0.15s linear;}
+#marcadorFabrica{font-size:34px;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.7));}
 
 #btnRecenter{position:fixed;right:14px;bottom:max(110px, calc(env(safe-area-inset-bottom) + 110px));z-index:35;width:46px;height:46px;border-radius:50%;background:rgba(10,10,11,0.85);backdrop-filter:blur(8px);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--text2);cursor:pointer;}
 #btnRecenter.ativo{color:var(--amber);border-color:rgba(245,158,11,0.4);}
+
+/* ===== VELOCÍMETRO DIGITAL ===== */
+#velocimetro{position:fixed;left:14px;bottom:max(110px, calc(env(safe-area-inset-bottom) + 110px));z-index:35;width:138px;height:138px;border-radius:42px;background:linear-gradient(160deg, #1e1e24, #0a0a0c);border:1px solid rgba(255,255,255,0.07);box-shadow:0 16px 34px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:background 0.35s, box-shadow 0.35s;}
+#velocimetro::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% -10%, rgba(245,158,11,0.22), transparent 65%);pointer-events:none;transition:opacity 0.35s;}
+
+.vel-core{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;}
+.vel-digital{display:flex;align-items:baseline;gap:4px;}
+.vel-digital span#velValor{font-size:46px;font-weight:900;color:var(--amber);font-variant-numeric:tabular-nums;letter-spacing:-1.5px;text-shadow:0 0 22px rgba(245,158,11,0.55);transition:color 0.3s, text-shadow 0.3s;}
+.vel-digital small{font-size:10.5px;font-weight:800;color:var(--text3);letter-spacing:1px;text-transform:uppercase;}
+.vel-status-pill{margin-top:9px;font-size:9.5px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--text3);background:rgba(255,255,255,0.06);padding:4px 12px;border-radius:20px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:6px;transition:all 0.3s;}
+.vel-status-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--text3);transition:background 0.3s;}
+
+.vel-rodape{position:absolute;bottom:10px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:4px;font-size:8.5px;font-weight:700;color:var(--text3);letter-spacing:0.3px;text-transform:uppercase;z-index:2;}
+.vel-rodape b{color:var(--text2);font-weight:800;font-variant-numeric:tabular-nums;}
+.vel-sep{opacity:0.4;}
+
+#velocimetro.vel-mover{background:linear-gradient(160deg, #163a26, #0a0a0c);}
+#velocimetro.vel-mover .vel-digital span#velValor{color:#4ade80;text-shadow:0 0 24px rgba(74,222,128,0.6);}
+#velocimetro.vel-mover .vel-status-pill{color:#4ade80;background:rgba(74,222,128,0.14);border-color:rgba(74,222,128,0.3);}
+#velocimetro.vel-mover .vel-status-pill .dot{background:#4ade80;box-shadow:0 0 7px rgba(74,222,128,0.9);animation:pulseDot 1.6s infinite;}
+
+#velocimetro.vel-rapido{background:linear-gradient(160deg, #3d1418, #0a0a0c);box-shadow:0 16px 34px rgba(239,68,68,0.3), inset 0 1px 0 rgba(255,255,255,0.07);}
+#velocimetro.vel-rapido .vel-digital span#velValor{color:#fb7185;text-shadow:0 0 26px rgba(251,113,133,0.7);}
+#velocimetro.vel-rapido .vel-status-pill{color:#fb7185;background:rgba(251,113,133,0.16);border-color:rgba(251,113,133,0.35);}
+#velocimetro.vel-rapido .vel-status-pill .dot{background:#fb7185;box-shadow:0 0 7px rgba(251,113,133,1);animation:pulseDot 0.9s infinite;}
 
 #loadingOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 #loadingOverlay .e{font-size:48px;animation:floatIcon 1.6s ease-in-out infinite;}
@@ -77,6 +103,21 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 
 <div id="btnRecenter">🧭</div>
 
+<div id="velocimetro">
+  <div class="vel-core">
+    <div class="vel-digital">
+      <span id="velValor">0</span>
+      <small>km/h</small>
+    </div>
+    <div class="vel-status-pill"><span class="dot"></span><span id="velStatus">parado</span></div>
+  </div>
+  <div class="vel-rodape">
+    <span>MÁX <b id="velMax">0</b></span>
+    <span class="vel-sep">•</span>
+    <span>km/h</span>
+  </div>
+</div>
+
 <div id="fab">
   🍗
   <div id="fabBadge" class="oculto">0</div>
@@ -120,29 +161,104 @@ const MAP_STYLE = {
   layers: [{ id:'carto-dark-layer', type:'raster', source:'carto-dark', minzoom:0, maxzoom:20 }]
 };
 
+// desloca o "centro" do mapa pra cima, fazendo a moto aparecer mais embaixo na tela (estilo Waze/Uber)
+function paddingCamera(){
+  return { top: window.innerHeight * 0.55, bottom: 0, left: 0, right: 0 };
+}
+
+// Fábrica: Rua Jaborandi, 41 - Cajueiro Seco, Jaboatão dos Guararapes - PE
+const FABRICA_LAT = -8.1837748;
+const FABRICA_LNG = -34.9384996;
+
+// gera um polígono circular (aproximado) em GeoJSON a partir de um centro e raio em metros
+function gerarCirculoGeoJSON(lat, lng, raioMetros, pontos = 64){
+  const coords = [];
+  const distX = raioMetros / (111320 * Math.cos(lat * Math.PI / 180));
+  const distY = raioMetros / 110540;
+  for(let i = 0; i <= pontos; i++){
+    const ang = (i / pontos) * 2 * Math.PI;
+    coords.push([lng + distX * Math.cos(ang), lat + distY * Math.sin(ang)]);
+  }
+  return { type:'Feature', geometry:{ type:'Polygon', coordinates:[coords] }, properties:{} };
+}
+
+function adicionarRaioFabrica(){
+  if(!map.getSource('raioFabrica')){
+    map.addSource('raioFabrica', { type:'geojson', data: gerarCirculoGeoJSON(FABRICA_LAT, FABRICA_LNG, 50) });
+    map.addLayer({
+      id:'raioFabricaFill', type:'fill', source:'raioFabrica',
+      paint:{ 'fill-color':'#3b82f6', 'fill-opacity':0.18 }
+    });
+    map.addLayer({
+      id:'raioFabricaLinha', type:'line', source:'raioFabrica',
+      paint:{ 'line-color':'#2563eb', 'line-width':2.5, 'line-opacity':0.85 }
+    });
+  }
+}
+
 function initMap(lat, lng){
   map = new maplibregl.Map({
     container: 'map',
     style: MAP_STYLE,
     center: [lng, lat],
-    zoom: 17.5,
-    pitch: 60,          // inclinação da câmera (estilo Waze)
+    zoom: 18,
+    pitch: 65,          // inclinação da câmera (estilo Waze)
     bearing: 0,
+    padding: paddingCamera(),
     attributionControl: true,
     dragRotate: true,
     touchPitch: true
   });
 
   map.on('load', ()=>{
+    adicionarRaioFabrica();
+
     const el = document.createElement('div');
     el.id = 'marcadorEntregador';
     el.textContent = '🛵';
     window._marker = new maplibregl.Marker({ element: el, anchor:'center' }).setLngLat([lng, lat]).addTo(map);
+
+    // marcador fixo da fábrica (casinha)
+    const elFabrica = document.createElement('div');
+    elFabrica.id = 'marcadorFabrica';
+    elFabrica.textContent = '🏠';
+    new maplibregl.Marker({ element: elFabrica, anchor:'bottom' }).setLngLat([FABRICA_LNG, FABRICA_LAT]).addTo(map);
+
     document.getElementById('loadingOverlay').style.display = 'none';
   });
 
-  // se o usuário arrastar o mapa manualmente, para de seguir a câmera automaticamente
-  map.on('dragstart', ()=>{ seguindoCamera = false; atualizarBtnRecenter(); });
+  // quando o usuário interage manualmente com o mapa (arrastar, zoom, girar), entra em modo 2D livre pra explorar
+  let timeoutVoltarSeguir = null;
+
+  function entrarModoExploracao(){
+    seguindoCamera = false;
+    atualizarBtnRecenter();
+    clearTimeout(timeoutVoltarSeguir);
+    if(map.getPitch() !== 0){
+      map.easeTo({ pitch: 0, zoom: Math.min(map.getZoom(), 15.5), padding: { top:0, bottom:0, left:0, right:0 }, duration: 400 });
+    }
+  }
+
+  function agendarVoltaAutomatica(){
+    if(seguindoCamera) return;
+    clearTimeout(timeoutVoltarSeguir);
+    timeoutVoltarSeguir = setTimeout(()=>{
+      seguindoCamera = true;
+      atualizarBtnRecenter();
+      if(window._marker){
+        const ll = window._marker.getLngLat();
+        map.easeTo({ center: ll, zoom:18, pitch:65, bearing: bearingAtual, padding: paddingCamera(), duration: 700 });
+      }
+    }, 5000);
+  }
+
+  // 'dragstart'/'zoomstart'/'rotatestart'/'pitchstart' só disparam por gesto do usuário quando originalEvent existe
+  ['dragstart','zoomstart','rotatestart','pitchstart'].forEach(ev=>{
+    map.on(ev, (e)=>{ if(e.originalEvent) entrarModoExploracao(); });
+  });
+  ['dragend','zoomend','rotateend','pitchend'].forEach(ev=>{
+    map.on(ev, (e)=>{ if(e.originalEvent) agendarVoltaAutomatica(); });
+  });
 }
 
 function atualizarBtnRecenter(){
@@ -161,14 +277,15 @@ function atualizarPosicao(lat, lng, heading){
   }
 
   if(!centralizouUmaVez){
-    map.jumpTo({ center:[lng, lat], zoom:17.5, pitch:60 });
+    map.jumpTo({ center:[lng, lat], zoom:18, pitch:65, padding: paddingCamera() });
     centralizouUmaVez = true;
   } else if(seguindoCamera){
     // câmera segue o entregador, levemente deslocada pra deixar a posição mais embaixo na tela
     map.easeTo({
       center: [lng, lat],
       bearing: heading != null && !isNaN(heading) ? heading : map.getBearing(),
-      pitch: 60,
+      pitch: 65,
+      padding: paddingCamera(),
       duration: 800,
       easing: t => t
     });
@@ -180,7 +297,7 @@ document.getElementById('btnRecenter').addEventListener('click', ()=>{
   atualizarBtnRecenter();
   if(map && window._marker){
     const ll = window._marker.getLngLat();
-    map.easeTo({ center: ll, zoom:17.5, pitch:60, bearing: bearingAtual, duration: 600 });
+    map.easeTo({ center: ll, zoom:18, pitch:65, bearing: bearingAtual, padding: paddingCamera(), duration: 600 });
   }
 });
 
@@ -188,24 +305,53 @@ function iniciarGPS(){
   if(!navigator.geolocation){
     document.getElementById('gpsTexto').textContent = 'GPS não suportado';
     document.getElementById('dotGps').classList.add('off');
-    initMap(-23.5505, -46.6333);
+    initMap(FABRICA_LAT, FABRICA_LNG);
     return;
   }
   watchId = navigator.geolocation.watchPosition((pos)=>{
     const { latitude, longitude, accuracy, speed, heading } = pos.coords;
     atualizarPosicao(latitude, longitude, heading);
+    atualizarVelocimetro(speed);
     document.getElementById('dotGps').classList.remove('off');
     document.getElementById('gpsTexto').textContent = 'GPS ativo • ±' + Math.round(accuracy) + 'm';
     enviarGPS(latitude, longitude, accuracy, speed, heading);
   }, (err)=>{
     document.getElementById('dotGps').classList.add('off');
     document.getElementById('gpsTexto').textContent = 'Sem sinal de GPS';
-    if(!map) initMap(-23.5505, -46.6333);
+    atualizarVelocimetro(0);
+    if(!map) initMap(FABRICA_LAT, FABRICA_LNG);
   }, { enableHighAccuracy:true, maximumAge:4000, timeout:15000 });
 }
 
 /* ===== ENVIA POSIÇÃO PRO SUPABASE (alimenta o acompanhamento do cliente) ===== */
 let _ultimoEnvioGPS = 0;
+
+/* ===== VELOCÍMETRO ===== */
+let velocidadeMaxima = 0;
+let velocidadeSuavizada = 0;
+
+function atualizarVelocimetro(velocidadeMS){
+  let kmh = (velocidadeMS != null && !isNaN(velocidadeMS) && velocidadeMS > 0) ? velocidadeMS * 3.6 : 0;
+  if(kmh < 1.5) kmh = 0; // ignora ruído de GPS parado
+
+  // suaviza a leitura pra não ficar tremendo
+  velocidadeSuavizada += (kmh - velocidadeSuavizada) * 0.35;
+  const kmhMostrado = Math.round(velocidadeSuavizada);
+  if(kmh > velocidadeMaxima) velocidadeMaxima = kmh;
+
+  document.getElementById('velValor').textContent = kmhMostrado;
+  document.getElementById('velMax').textContent = Math.round(velocidadeMaxima);
+
+  const wrap = document.getElementById('velocimetro');
+  const statusEl = document.getElementById('velStatus');
+  wrap.classList.remove('vel-mover','vel-rapido');
+  if(kmhMostrado <= 0){ statusEl.textContent = 'parado'; }
+  else if(kmhMostrado < 45){ statusEl.textContent = 'em rota'; wrap.classList.add('vel-mover'); }
+  else { statusEl.textContent = 'rápido'; wrap.classList.add('vel-rapido'); }
+}
+
+atualizarVelocimetro(0);
+
 async function enviarGPS(lat, lon, accuracy, speed, heading){
   const agora = Date.now();
   if(agora - _ultimoEnvioGPS < 4000) return; // limita a 1 envio a cada 4s

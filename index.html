@@ -244,6 +244,62 @@ function initMap(lat, lng){
   map.on('load', ()=>{
     adicionarRaioFabrica();
 
+    // trajeto em setinhas ao longo da rua (não linha cheia), em 3 cores:
+    // vermelho = já passou · azul = da moto até a próxima parada · verde = da próxima em diante
+    map.addSource('trajetoriaPassada', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'trajetoriaPassadaLayer',
+      type: 'symbol',
+      source: 'trajetoriaPassada',
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 35,
+        'text-field': '▲',
+        'text-size': 15,
+        'text-rotation-alignment': 'map',
+        'text-pitch-alignment': 'map',
+        'text-keep-upright': false,
+        'text-allow-overlap': true
+      },
+      paint: { 'text-color': '#ef4444', 'text-opacity': 0.85 }
+    });
+
+    map.addSource('trajetoriaProximo', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'trajetoriaProximoLayer',
+      type: 'symbol',
+      source: 'trajetoriaProximo',
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 35,
+        'text-field': '▲',
+        'text-size': 15,
+        'text-rotation-alignment': 'map',
+        'text-pitch-alignment': 'map',
+        'text-keep-upright': false,
+        'text-allow-overlap': true
+      },
+      paint: { 'text-color': '#38bdf8', 'text-opacity': 0.9 }
+    });
+
+    map.addSource('trajetoriaRestante', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'trajetoriaRestanteLayer',
+      type: 'symbol',
+      source: 'trajetoriaRestante',
+      layout: {
+        'symbol-placement': 'line',
+        'symbol-spacing': 35,
+        'text-field': '▲',
+        'text-size': 15,
+        'text-rotation-alignment': 'map',
+        'text-pitch-alignment': 'map',
+        'text-keep-upright': false,
+        'text-allow-overlap': true
+      },
+      paint: { 'text-color': '#22c55e', 'text-opacity': 0.85 }
+    });
+
     const el = document.createElement('div');
     el.id = 'marcadorEntregador';
     const iconGiro = document.createElement('div');
@@ -369,6 +425,7 @@ function iniciarGPS(){
     document.getElementById('gpsTexto').textContent = 'GPS ativo • ±' + Math.round(accuracy) + 'm';
     enviarGPS(latitude, longitude, accuracy, speed, heading);
     verificarGeofenceFabrica(latitude, longitude);
+    atualizarCorTrajetoria(); // recorta vermelho/verde na posição atual, sem precisar buscar rota de novo
   }, (err)=>{
     document.getElementById('dotGps').classList.add('off');
     document.getElementById('gpsTexto').textContent = 'Sem sinal de GPS';
@@ -518,7 +575,18 @@ fab.addEventListener('pointermove', (e)=>{ moverDrag(e.clientX, e.clientY); });
 fab.addEventListener('pointerup', soltarDrag);
 fab.addEventListener('pointercancel', soltarDrag);
 
-/* ===== MARCADORES DE CLIENTES NO MAPA (👤 roxo) ===== */
+// mostra o erro direto na tela (útil no celular, sem precisar abrir console)
+function mostrarErroDebug(msg){
+  let el = document.getElementById('erroDebugBanner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'erroDebugBanner';
+    el.style.cssText = 'position:fixed;top:60px;left:10px;right:10px;z-index:99999;background:#dc2626;color:white;padding:12px 14px;border-radius:10px;font-size:12px;font-family:monospace;box-shadow:0 4px 12px rgba(0,0,0,0.5);word-break:break-word;';
+    el.onclick = () => el.remove();
+    document.body.appendChild(el);
+  }
+  el.textContent = '⚠️ ' + msg + ' (toque pra fechar)';
+}
 window._clienteMarkers = window._clienteMarkers || [];
 
 // converte "coordenadas" salvo em clientes (ex: "-8,1611343, -34,9278525") em {lat, lng}
@@ -545,6 +613,161 @@ function limparMarcadoresClientes(){
   window._clienteMarkers = [];
 }
 
+// busca o trajeto seguindo as ruas (não é linha reta) ligando fábrica -> 1º cliente -> 2º -> ...
+// usa o serviço público OSRM, que devolve a geometria já "colada" nas ruas reais
+let _ultimaChaveRota = null;    // evita recalcular/redesenhar à toa se a rota não mudou (mais leve pro zoom)
+let _rotaCompletaCoords = null; // guarda a geometria toda [[lng,lat],...] pra poder cortar por cor localmente
+let _limitesParadas = [];       // índice (em _rotaCompletaCoords) de onde cada parada fica, em ordem
+
+async function atualizarTrajetoriaRota(pontosOrdenados){
+  if(!map || !map.getSource('trajetoriaPassada')) return;
+
+  if(!pontosOrdenados || pontosOrdenados.length === 0){
+    if(_ultimaChaveRota !== null){
+      map.getSource('trajetoriaPassada').setData({ type:'FeatureCollection', features: [] });
+      map.getSource('trajetoriaProximo').setData({ type:'FeatureCollection', features: [] });
+      map.getSource('trajetoriaRestante').setData({ type:'FeatureCollection', features: [] });
+      _ultimaChaveRota = null;
+      _rotaCompletaCoords = null;
+      _limitesParadas = [];
+    }
+    return;
+  }
+
+  // chave simples pra saber se a sequência de paradas mudou desde a última vez
+  const chave = pontosOrdenados.map(p => p.lat.toFixed(5)+','+p.lng.toFixed(5)).join('|');
+  if(chave === _ultimaChaveRota) return; // nada mudou, não redesenha (evita travar o zoom à toa)
+
+  try{
+    const todosPontos = [{ lat: FABRICA_LAT, lng: FABRICA_LNG }, ...pontosOrdenados];
+    const coordsStr = todosPontos.map(p => `${p.lng},${p.lat}`).join(';');
+    // steps=true: devolve a rota dividida por trecho (fábrica->parada1, parada1->parada2...),
+    // assim dá pra saber exatamente onde cada parada fica dentro da linha toda
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?geometries=geojson&steps=true&overview=full`;
+
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if(json.code !== 'Ok' || !json.routes || !json.routes[0]){
+      throw new Error('OSRM retornou: ' + (json.code || 'sem rota'));
+    }
+
+    // concatena a geometria de cada passo de cada trecho, guardando onde cada parada termina
+    let coords = [];
+    const limites = [];
+    (json.routes[0].legs || []).forEach(leg => {
+      (leg.steps || []).forEach(step => {
+        const c = step.geometry.coordinates;
+        if(!c || !c.length) return;
+        if(coords.length && coords[coords.length-1][0] === c[0][0] && coords[coords.length-1][1] === c[0][1]){
+          coords.push(...c.slice(1));
+        } else {
+          coords.push(...c);
+        }
+      });
+      limites.push(coords.length - 1); // fim deste trecho = posição de uma parada
+    });
+
+    // reduz a quantidade de pontos (mais leve pro zoom), sem perder os pontos das paradas
+    const reduzido = _decimarRota(coords, limites, 3);
+
+    _rotaCompletaCoords = reduzido.coords;
+    _limitesParadas = reduzido.limites;
+    _ultimaChaveRota = chave;
+    atualizarCorTrajetoria(); // já desenha cortando na posição atual conhecida
+  }catch(e){
+    console.warn('Erro ao calcular trajetória da rota (seguindo ruas):', e);
+  }
+}
+
+// reduz pontos "de recheio" pra aliviar o desenho, mas nunca remove os pontos que marcam
+// o fim de cada trecho (senão perderia a referência de onde fica cada parada)
+function _decimarRota(coords, limites, passo){
+  const manter = new Set([0, coords.length-1, ...limites]);
+  const mapaIndices = new Array(coords.length);
+  const novo = [];
+  coords.forEach((c, i) => {
+    if(i % passo === 0 || manter.has(i)){
+      mapaIndices[i] = novo.length;
+      novo.push(c);
+    }
+  });
+  let ultimo = 0;
+  for(let i=0;i<coords.length;i++){
+    if(mapaIndices[i] !== undefined) ultimo = mapaIndices[i];
+    else mapaIndices[i] = ultimo;
+  }
+  return { coords: novo, limites: limites.map(l => mapaIndices[l]) };
+}
+
+// converte lat/lng pra um plano local em metros (aproximação boa o suficiente na escala de uma cidade)
+function _localXY(lat, lng, latRef){
+  const R = 6371000;
+  return {
+    x: (lng * Math.PI/180) * R * Math.cos(latRef * Math.PI/180),
+    y: (lat * Math.PI/180) * R
+  };
+}
+
+// acha o ponto mais próximo da posição atual em cima da linha da rota (projeção em cada segmento)
+function _acharPosicaoNaRota(coordsLngLat, lat, lng){
+  if(!coordsLngLat || coordsLngLat.length < 2) return null;
+  const p = _localXY(lat, lng, lat);
+  let melhor = { idx: 0, t: 0, dist: Infinity };
+  for(let i=0;i<coordsLngLat.length-1;i++){
+    const a = _localXY(coordsLngLat[i][1], coordsLngLat[i][0], lat);
+    const b = _localXY(coordsLngLat[i+1][1], coordsLngLat[i+1][0], lat);
+    const dx = b.x-a.x, dy = b.y-a.y;
+    const lenSq = dx*dx + dy*dy;
+    let t = lenSq > 0 ? ((p.x-a.x)*dx + (p.y-a.y)*dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const projX = a.x + dx*t, projY = a.y + dy*t;
+    const dist = Math.hypot(p.x-projX, p.y-projY);
+    if(dist < melhor.dist) melhor = { idx: i, t, dist };
+  }
+  return melhor;
+}
+
+// monta um trecho da linha entre dois índices (com pontos de corte interpolados no início/fim)
+function _fatiaComCorte(coordsLngLat, inicioIdx, inicioT, fimIdx, fimT){
+  const pontoInicial = _interpolar(coordsLngLat, inicioIdx, inicioT);
+  const pontoFinal    = _interpolar(coordsLngLat, fimIdx, fimT);
+  const meio = coordsLngLat.slice(inicioIdx+1, fimIdx+1);
+  return [pontoInicial, ...meio, pontoFinal];
+}
+
+function _interpolar(coordsLngLat, idx, t){
+  const a = coordsLngLat[idx], b = coordsLngLat[idx+1] || a;
+  return [ a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t ];
+}
+
+// redesenha as 3 cores usando a última posição de GPS conhecida (sem precisar buscar rota de novo):
+// vermelho = início até a moto · azul = da moto até a próxima parada · verde = da próxima parada até o fim
+function atualizarCorTrajetoria(){
+  if(!map || !_rotaCompletaCoords || !map.getSource('trajetoriaPassada')) return;
+  const pos = _ultimaPosicaoValida || { lat: FABRICA_LAT, lng: FABRICA_LNG };
+  const posNaRota = _acharPosicaoNaRota(_rotaCompletaCoords, pos.lat, pos.lng);
+  if(!posNaRota) return;
+
+  const posicaoGlobal = posNaRota.idx + posNaRota.t;
+
+  // acha a próxima parada: primeiro limite que está à frente da posição atual
+  let limiteProximo = _limitesParadas.find(l => l >= posicaoGlobal);
+  if(limiteProximo === undefined) limiteProximo = _rotaCompletaCoords.length - 1; // já passou de todas
+
+  const passada = _fatiaComCorte(_rotaCompletaCoords, 0, 0, posNaRota.idx, posNaRota.t);
+  const proximo = _fatiaComCorte(_rotaCompletaCoords, posNaRota.idx, posNaRota.t, limiteProximo, 0);
+  const restante = _rotaCompletaCoords.slice(limiteProximo);
+
+  map.getSource('trajetoriaPassada').setData({ type:'Feature', geometry:{ type:'LineString', coordinates: passada } });
+  map.getSource('trajetoriaProximo').setData({ type:'Feature', geometry:{ type:'LineString', coordinates: proximo } });
+  map.getSource('trajetoriaRestante').setData(
+    restante.length >= 2
+      ? { type:'Feature', geometry:{ type:'LineString', coordinates: restante } }
+      : { type:'FeatureCollection', features: [] }
+  );
+}
+
+
 // status que contam como "pedido ativo hoje" (ainda não entregue)
 const STATUS_ATIVOS = ['Em produção', 'Em espera', 'A caminho'];
 // dentre os ativos, esses já foram confirmados pelo ADM e estão prontos/indo pra entrega (podem virar "próximo")
@@ -558,11 +781,15 @@ async function atualizarMarcadoresClientes(){
     inicioHoje.setHours(0,0,0,0);
 
     const [{ data: clientes, error: errC }, { data: pedidosHoje, error: errP }] = await Promise.all([
-      sb.from('clientes').select('phone,coordenadas,name,rota,posição_rota'),
+      sb.from('clientes').select('phone,coordenadas,name'),
       sb.from('pedidos').select('customer_phone,status,created_at').gte('created_at', inicioHoje.toISOString())
     ]);
     if(errC) throw errC;
     if(errP) throw errP;
+
+    if(!clientes || clientes.length === 0){
+      mostrarErroDebug('A tabela "clientes" voltou vazia (0 linhas). Verifique se ela existe e se tem dados.');
+    }
 
     // pega o pedido mais recente de cada telefone (hoje)
     const pedidoPorTelefone = {};
@@ -574,15 +801,20 @@ async function atualizarMarcadoresClientes(){
       }
     });
 
-    // mapa telefone -> posição na rota (definida pelo ADM na tabela clientes).
-    // fica como texto puro mesmo, sem converter — a ordenação abaixo usa "-" na comparação,
-    // que já resolve a ordem certa (1, 2, 10...) mesmo com o valor sendo string.
+    // mapa telefone -> posição na rota. Busca separada de propósito: se essa coluna
+    // não existir ou der erro por qualquer motivo, os marcadores continuam aparecendo normal.
     window._posicaoRotaPorTelefone = {};
-    (clientes || []).forEach(c => {
-      const bruto = c['posição_rota'];
-      if(!c.phone || bruto == null || bruto === '') return;
-      window._posicaoRotaPorTelefone[c.phone] = bruto;
-    });
+    try{
+      const { data: comPosicao, error: errPos } = await sb.from('clientes').select('phone,posição_rota');
+      if(errPos) throw errPos;
+      (comPosicao || []).forEach(c => {
+        const bruto = c['posição_rota'];
+        if(!c.phone || bruto == null || bruto === '') return;
+        window._posicaoRotaPorTelefone[c.phone] = bruto;
+      });
+    }catch(ePos){
+      console.warn('Posição de rota indisponível (coluna "posição_rota" pode não existir na tabela clientes):', ePos);
+    }
 
     // ícone/cor do selinho de status, conforme a etapa do pedido de hoje
     // "Entregue" não entra aqui de propósito: pedido entregue volta ao visual normal
@@ -595,6 +827,8 @@ async function atualizarMarcadoresClientes(){
 
     limparMarcadoresClientes();
 
+    const pontosDaRota = []; // { coord, pos } de quem está "Em espera"/"A caminho", pra desenhar o trajeto
+
     (clientes || []).forEach(c => {
       const coord = parseCoordenadas(c.coordenadas);
       if(!coord) return;
@@ -605,6 +839,11 @@ async function atualizarMarcadoresClientes(){
       const pedido = pedidoPorTelefone[c.phone];
       const emFilaDeEntrega = pedido && STATUS_PENDENTES_ENTREGA.includes(pedido.status);
       const posicaoCliente = window._posicaoRotaPorTelefone[c.phone]; // texto puro, do jeito que está na tabela
+
+      if(emFilaDeEntrega){
+        const posNum = posicaoCliente != null ? Number(posicaoCliente) : 9999;
+        pontosDaRota.push({ coord, pos: isNaN(posNum) ? 9999 : posNum });
+      }
 
       const nomeLabel = document.createElement('div');
       nomeLabel.className = 'nomeLabel';
@@ -642,8 +881,13 @@ async function atualizarMarcadoresClientes(){
 
       window._clienteMarkers.push(marker);
     });
+
+    // desenha o trajeto seguindo as ruas, na ordem da posição de cada cliente
+    pontosDaRota.sort((a, b) => a.pos - b.pos);
+    atualizarTrajetoriaRota(pontosDaRota.map(p => p.coord));
   }catch(e){
     console.error('Erro ao carregar marcadores de clientes:', e);
+    mostrarErroDebug('Marcadores: ' + (e.message || JSON.stringify(e)));
   }
 }
 

@@ -79,6 +79,27 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 .dot-live.off{background:#ef4444;animation:none;}
 @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.5);}50%{box-shadow:0 0 0 7px rgba(34,197,94,0);}}
 
+#rotaChip{position:fixed;top:max(14px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:30;background:rgba(10,10,11,0.85);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:30px;padding:8px 14px;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--text);max-width:62vw;cursor:pointer;}
+#rotaChip .bolinha{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--text3);}
+#rotaChip .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#rotaChip .seta{color:var(--text3);font-size:9px;flex-shrink:0;}
+#rotaChip.sem-rota{color:var(--text3);font-weight:700;}
+
+#overlayRotas{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:59;opacity:0;pointer-events:none;transition:opacity 0.25s;}
+#overlayRotas.aberto{opacity:1;pointer-events:auto;}
+#painelRotas{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface);border-top:1px solid var(--border);border-radius:24px 24px 0 0;max-height:70vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.32s cubic-bezier(.2,.9,.3,1);box-shadow:0 -10px 40px rgba(0,0,0,0.5);}
+#painelRotas.aberto{transform:translateY(0);}
+#painelRotas .painel-body{overflow-y:auto;padding:6px 16px 28px;-webkit-overflow-scrolling:touch;}
+.rota-item{display:flex;align-items:center;gap:12px;padding:14px 6px;border-bottom:1px solid var(--border);}
+.rota-item:last-child{border-bottom:none;}
+.rota-item .bolinha{width:14px;height:14px;border-radius:50%;flex-shrink:0;}
+.rota-item .info{flex:1;min-width:0;}
+.rota-item .nome{font-size:14.5px;font-weight:800;}
+.rota-item .horario{font-size:11.5px;color:var(--text3);font-weight:700;margin-top:2px;}
+.rota-item .check{font-size:18px;color:var(--text3);}
+.rota-item.ativa .check{color:var(--amber);}
+#semRotasHoje{text-align:center;color:var(--text3);font-size:12.5px;padding:30px 20px;}
+
 #fab{position:fixed;width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ea580c);box-shadow:0 8px 24px rgba(234,88,12,0.45), 0 0 0 4px rgba(10,10,11,0.6);z-index:40;display:flex;align-items:center;justify-content:center;font-size:26px;cursor:grab;touch-action:none;transition:transform 0.15s;}
 #fab:active{cursor:grabbing;transform:scale(0.93);}
 #fabBadge{position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:10.5px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--bg);}
@@ -115,7 +136,22 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 
 <div id="gpsBadge"><div class="dot-live" id="dotGps"></div><span id="gpsTexto">Buscando GPS...</span></div>
 
+<div id="rotaChip" class="sem-rota"><div class="bolinha"></div><span class="txt">carregando rota...</span><span class="seta">▾</span></div>
+
 <div id="btnRecenter">🧭</div>
+
+<div id="overlayRotas"></div>
+<div id="painelRotas">
+  <div class="painel-handle"></div>
+  <div class="painel-header">
+    <div>
+      <h2>Escolher rota</h2>
+      <div class="count" id="painelRotasCount">carregando...</div>
+    </div>
+    <button id="fecharPainelRotas">✕</button>
+  </div>
+  <div class="painel-body" id="listaRotas"></div>
+</div>
 
 <div id="velocimetro">
   <svg class="vel-ring" viewBox="0 0 140 140">
@@ -171,6 +207,7 @@ let _ultimaPosicaoValida = null; // { lat, lng, t } — usada pra filtrar saltos
 // Estilo de mapa escuro gratuito (CARTO) — sem precisar de chave de API
 const MAP_STYLE = {
   version: 8,
+  glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
   sources: {
     'carto-dark': {
       type: 'raster',
@@ -244,60 +281,14 @@ function initMap(lat, lng){
   map.on('load', ()=>{
     adicionarRaioFabrica();
 
-    // trajeto em setinhas ao longo da rua (não linha cheia), em 3 cores:
-    // vermelho = já passou · azul = da moto até a próxima parada · verde = da próxima em diante
-    map.addSource('trajetoriaPassada', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({
-      id: 'trajetoriaPassadaLayer',
-      type: 'symbol',
-      source: 'trajetoriaPassada',
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': 35,
-        'text-field': '▲',
-        'text-size': 15,
-        'text-rotation-alignment': 'map',
-        'text-pitch-alignment': 'map',
-        'text-keep-upright': false,
-        'text-allow-overlap': true
-      },
-      paint: { 'text-color': '#ef4444', 'text-opacity': 0.85 }
-    });
-
+    // trajeto ao longo da rua: só o trecho da posição atual até a próxima parada, como um traço (linha), sem setas
     map.addSource('trajetoriaProximo', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
       id: 'trajetoriaProximoLayer',
-      type: 'symbol',
+      type: 'line',
       source: 'trajetoriaProximo',
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': 35,
-        'text-field': '▲',
-        'text-size': 15,
-        'text-rotation-alignment': 'map',
-        'text-pitch-alignment': 'map',
-        'text-keep-upright': false,
-        'text-allow-overlap': true
-      },
-      paint: { 'text-color': '#38bdf8', 'text-opacity': 0.9 }
-    });
-
-    map.addSource('trajetoriaRestante', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({
-      id: 'trajetoriaRestanteLayer',
-      type: 'symbol',
-      source: 'trajetoriaRestante',
-      layout: {
-        'symbol-placement': 'line',
-        'symbol-spacing': 35,
-        'text-field': '▲',
-        'text-size': 15,
-        'text-rotation-alignment': 'map',
-        'text-pitch-alignment': 'map',
-        'text-keep-upright': false,
-        'text-allow-overlap': true
-      },
-      paint: { 'text-color': '#22c55e', 'text-opacity': 0.85 }
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#38bdf8', 'line-width': 4, 'line-opacity': 0.95 }
     });
 
     const el = document.createElement('div');
@@ -620,13 +611,11 @@ let _rotaCompletaCoords = null; // guarda a geometria toda [[lng,lat],...] pra p
 let _limitesParadas = [];       // índice (em _rotaCompletaCoords) de onde cada parada fica, em ordem
 
 async function atualizarTrajetoriaRota(pontosOrdenados){
-  if(!map || !map.getSource('trajetoriaPassada')) return;
+  if(!map || !map.getSource('trajetoriaProximo')) return;
 
   if(!pontosOrdenados || pontosOrdenados.length === 0){
     if(_ultimaChaveRota !== null){
-      map.getSource('trajetoriaPassada').setData({ type:'FeatureCollection', features: [] });
       map.getSource('trajetoriaProximo').setData({ type:'FeatureCollection', features: [] });
-      map.getSource('trajetoriaRestante').setData({ type:'FeatureCollection', features: [] });
       _ultimaChaveRota = null;
       _rotaCompletaCoords = null;
       _limitesParadas = [];
@@ -641,9 +630,7 @@ async function atualizarTrajetoriaRota(pontosOrdenados){
   try{
     const todosPontos = [{ lat: FABRICA_LAT, lng: FABRICA_LNG }, ...pontosOrdenados];
     const coordsStr = todosPontos.map(p => `${p.lng},${p.lat}`).join(';');
-    // steps=true: devolve a rota dividida por trecho (fábrica->parada1, parada1->parada2...),
-    // assim dá pra saber exatamente onde cada parada fica dentro da linha toda
-    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?geometries=geojson&steps=true&overview=full`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?geometries=geojson&overview=full`;
 
     const resp = await fetch(url);
     const json = await resp.json();
@@ -651,24 +638,17 @@ async function atualizarTrajetoriaRota(pontosOrdenados){
       throw new Error('OSRM retornou: ' + (json.code || 'sem rota'));
     }
 
-    // concatena a geometria de cada passo de cada trecho, guardando onde cada parada termina
-    let coords = [];
-    const limites = [];
-    (json.routes[0].legs || []).forEach(leg => {
-      (leg.steps || []).forEach(step => {
-        const c = step.geometry.coordinates;
-        if(!c || !c.length) return;
-        if(coords.length && coords[coords.length-1][0] === c[0][0] && coords[coords.length-1][1] === c[0][1]){
-          coords.push(...c.slice(1));
-        } else {
-          coords.push(...c);
-        }
-      });
-      limites.push(coords.length - 1); // fim deste trecho = posição de uma parada
+    // usa a linha única que a API já devolve prontinha, colada nas ruas — sem remontar na mão
+    const coordsBrutos = json.routes[0].geometry.coordinates; // [[lng,lat], ...]
+
+    // acha, pra cada parada (na ordem), o ponto mais próximo dela em cima dessa linha
+    const limitesBrutos = pontosOrdenados.map(p => {
+      const achado = _acharPosicaoNaRota(coordsBrutos, p.lat, p.lng);
+      return achado ? Math.round(achado.idx + achado.t) : coordsBrutos.length - 1;
     });
 
     // reduz a quantidade de pontos (mais leve pro zoom), sem perder os pontos das paradas
-    const reduzido = _decimarRota(coords, limites, 3);
+    const reduzido = _decimarRota(coordsBrutos, limitesBrutos, 3);
 
     _rotaCompletaCoords = reduzido.coords;
     _limitesParadas = reduzido.limites;
@@ -676,6 +656,7 @@ async function atualizarTrajetoriaRota(pontosOrdenados){
     atualizarCorTrajetoria(); // já desenha cortando na posição atual conhecida
   }catch(e){
     console.warn('Erro ao calcular trajetória da rota (seguindo ruas):', e);
+    mostrarErroDebug('Trajeto: ' + (e.message || JSON.stringify(e)));
   }
 }
 
@@ -740,31 +721,31 @@ function _interpolar(coordsLngLat, idx, t){
   return [ a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t ];
 }
 
-// redesenha as 3 cores usando a última posição de GPS conhecida (sem precisar buscar rota de novo):
-// vermelho = início até a moto · azul = da moto até a próxima parada · verde = da próxima parada até o fim
+// redesenha usando a última posição de GPS conhecida (sem precisar buscar rota de novo):
+// só o trecho da posição atual até a próxima parada
 function atualizarCorTrajetoria(){
-  if(!map || !_rotaCompletaCoords || !map.getSource('trajetoriaPassada')) return;
-  const pos = _ultimaPosicaoValida || { lat: FABRICA_LAT, lng: FABRICA_LNG };
-  const posNaRota = _acharPosicaoNaRota(_rotaCompletaCoords, pos.lat, pos.lng);
-  if(!posNaRota) return;
+  if(!map || !_rotaCompletaCoords || !map.getSource('trajetoriaProximo')) return;
+  try{
+    const pos = _ultimaPosicaoValida || { lat: FABRICA_LAT, lng: FABRICA_LNG };
+    const posNaRota = _acharPosicaoNaRota(_rotaCompletaCoords, pos.lat, pos.lng);
+    if(!posNaRota) return;
 
-  const posicaoGlobal = posNaRota.idx + posNaRota.t;
+    const posicaoGlobal = posNaRota.idx + posNaRota.t;
 
-  // acha a próxima parada: primeiro limite que está à frente da posição atual
-  let limiteProximo = _limitesParadas.find(l => l >= posicaoGlobal);
-  if(limiteProximo === undefined) limiteProximo = _rotaCompletaCoords.length - 1; // já passou de todas
+    // acha a próxima parada: primeiro limite que está à frente da posição atual
+    let limiteProximo = _limitesParadas.find(l => l >= posicaoGlobal);
+    if(limiteProximo === undefined) limiteProximo = _rotaCompletaCoords.length - 1; // já passou de todas
+    if(limiteProximo < posNaRota.idx) limiteProximo = posNaRota.idx; // nunca deixa ficar "pra trás"
 
-  const passada = _fatiaComCorte(_rotaCompletaCoords, 0, 0, posNaRota.idx, posNaRota.t);
-  const proximo = _fatiaComCorte(_rotaCompletaCoords, posNaRota.idx, posNaRota.t, limiteProximo, 0);
-  const restante = _rotaCompletaCoords.slice(limiteProximo);
+    const proximo = _fatiaComCorte(_rotaCompletaCoords, posNaRota.idx, posNaRota.t, limiteProximo, 0);
 
-  map.getSource('trajetoriaPassada').setData({ type:'Feature', geometry:{ type:'LineString', coordinates: passada } });
-  map.getSource('trajetoriaProximo').setData({ type:'Feature', geometry:{ type:'LineString', coordinates: proximo } });
-  map.getSource('trajetoriaRestante').setData(
-    restante.length >= 2
-      ? { type:'Feature', geometry:{ type:'LineString', coordinates: restante } }
-      : { type:'FeatureCollection', features: [] }
-  );
+    map.getSource('trajetoriaProximo').setData(
+      proximo.length >= 2 ? { type:'Feature', geometry:{ type:'LineString', coordinates: proximo } } : { type:'FeatureCollection', features: [] }
+    );
+  }catch(e){
+    console.warn('Erro ao cortar a trajetória por cor:', e);
+    mostrarErroDebug('Cor da trajetória: ' + (e.message || JSON.stringify(e)));
+  }
 }
 
 
@@ -773,6 +754,101 @@ const STATUS_ATIVOS = ['Em produção', 'Em espera', 'A caminho'];
 // dentre os ativos, esses já foram confirmados pelo ADM e estão prontos/indo pra entrega (podem virar "próximo")
 const STATUS_PENDENTES_ENTREGA = ['Em espera', 'A caminho'];
 
+/* ===== ROTAS DO DIA ===== */
+let rotaAtivaId = localStorage.getItem('rotaAtivaId') || null;
+let _rotasHoje = []; // cache das rotas válidas pra hoje (dia da semana + ativa=true)
+
+function _diaSemanaHoje(){
+  return new Date().getDay(); // 0=domingo ... 6=sábado, igual ao dias_semana do banco
+}
+
+async function carregarRotasHoje(){
+  const chip = document.getElementById('rotaChip');
+  try{
+    const dia = _diaSemanaHoje();
+    const { data, error } = await sb.from('rotas').select('id,nome,cor,horario_saida,dias_semana,ativa').eq('ativa', true);
+    if(error) throw error;
+
+    _rotasHoje = (data || []).filter(r => Array.isArray(r.dias_semana) && r.dias_semana.includes(dia))
+      .sort((a,b) => (a.horario_saida || '').localeCompare(b.horario_saida || ''));
+
+    if(_rotasHoje.length === 0){
+      rotaAtivaId = null;
+      localStorage.removeItem('rotaAtivaId');
+      chip.className = 'sem-rota';
+      chip.querySelector('.txt').textContent = 'sem rota hoje';
+      chip.querySelector('.bolinha').style.background = 'var(--text3)';
+      return;
+    }
+
+    // valida se a rota salva ainda existe entre as de hoje; senão, escolhe/pergunta
+    const salvaAindaValida = _rotasHoje.find(r => r.id === rotaAtivaId);
+    if(salvaAindaValida){
+      selecionarRota(salvaAindaValida, false);
+    }else if(_rotasHoje.length === 1){
+      selecionarRota(_rotasHoje[0], false);
+    }else{
+      chip.className = '';
+      chip.querySelector('.txt').textContent = 'escolher rota';
+      chip.querySelector('.bolinha').style.background = 'var(--text3)';
+      abrirPainelRotas();
+    }
+  }catch(e){
+    console.error('Erro ao carregar rotas:', e);
+    mostrarErroDebug('Rotas: ' + (e.message || JSON.stringify(e)));
+  }
+}
+
+function selecionarRota(rota, atualizarDepois){
+  rotaAtivaId = rota.id;
+  localStorage.setItem('rotaAtivaId', rota.id);
+  const chip = document.getElementById('rotaChip');
+  chip.className = '';
+  chip.querySelector('.txt').textContent = rota.nome;
+  chip.querySelector('.bolinha').style.background = rota.cor || 'var(--amber)';
+  if(atualizarDepois) carregarPedidos();
+}
+
+function abrirPainelRotas(){
+  const lista = document.getElementById('listaRotas');
+  const count = document.getElementById('painelRotasCount');
+  lista.innerHTML = '';
+
+  if(_rotasHoje.length === 0){
+    lista.innerHTML = '<div id="semRotasHoje">📭 Nenhuma rota configurada para hoje.</div>';
+    count.textContent = '0 rotas';
+  }else{
+    count.textContent = _rotasHoje.length + (_rotasHoje.length === 1 ? ' rota hoje' : ' rotas hoje');
+    _rotasHoje.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'rota-item' + (r.id === rotaAtivaId ? ' ativa' : '');
+      div.innerHTML = `
+        <div class="bolinha" style="background:${r.cor || '#f59e0b'}"></div>
+        <div class="info">
+          <div class="nome">${r.nome}</div>
+          <div class="horario">${r.horario_saida ? 'saída ' + r.horario_saida.slice(0,5) : 'sem horário definido'}</div>
+        </div>
+        <div class="check">${r.id === rotaAtivaId ? '✓' : ''}</div>
+      `;
+      div.onclick = () => {
+        selecionarRota(r, true);
+        fecharPainelRotas();
+      };
+      lista.appendChild(div);
+    });
+  }
+
+  document.getElementById('painelRotas').classList.add('aberto');
+  document.getElementById('overlayRotas').classList.add('aberto');
+}
+function fecharPainelRotas(){
+  document.getElementById('painelRotas').classList.remove('aberto');
+  document.getElementById('overlayRotas').classList.remove('aberto');
+}
+document.getElementById('rotaChip').onclick = abrirPainelRotas;
+document.getElementById('fecharPainelRotas').onclick = fecharPainelRotas;
+document.getElementById('overlayRotas').onclick = fecharPainelRotas;
+
 async function atualizarMarcadoresClientes(){
   if(!map) return;
 
@@ -780,15 +856,23 @@ async function atualizarMarcadoresClientes(){
     const inicioHoje = new Date();
     inicioHoje.setHours(0,0,0,0);
 
+    // sem rota ativa selecionada hoje: não mostra ninguém (evita "sair todo mundo junto")
+    if(!rotaAtivaId){
+      limparMarcadoresClientes();
+      window._posicaoRotaPorTelefone = {};
+      window._telefonesRotaAtiva = new Set();
+      return;
+    }
+
     const [{ data: clientes, error: errC }, { data: pedidosHoje, error: errP }] = await Promise.all([
-      sb.from('clientes').select('phone,coordenadas,name'),
+      sb.from('clientes').select('phone,coordenadas,name,posicao_na_rota').eq('rota_id', rotaAtivaId),
       sb.from('pedidos').select('customer_phone,status,created_at').gte('created_at', inicioHoje.toISOString())
     ]);
     if(errC) throw errC;
     if(errP) throw errP;
 
     if(!clientes || clientes.length === 0){
-      mostrarErroDebug('A tabela "clientes" voltou vazia (0 linhas). Verifique se ela existe e se tem dados.');
+      mostrarErroDebug('Nenhum cliente vinculado a essa rota ainda.');
     }
 
     // pega o pedido mais recente de cada telefone (hoje)
@@ -801,20 +885,17 @@ async function atualizarMarcadoresClientes(){
       }
     });
 
-    // mapa telefone -> posição na rota. Busca separada de propósito: se essa coluna
-    // não existir ou der erro por qualquer motivo, os marcadores continuam aparecendo normal.
+    // mapa telefone -> posição na rota (coluna posicao_na_rota, já vinda no select acima)
+    // e conjunto de telefones que pertencem à rota ativa, pra filtrar o painel de pedidos
     window._posicaoRotaPorTelefone = {};
-    try{
-      const { data: comPosicao, error: errPos } = await sb.from('clientes').select('phone,posição_rota');
-      if(errPos) throw errPos;
-      (comPosicao || []).forEach(c => {
-        const bruto = c['posição_rota'];
-        if(!c.phone || bruto == null || bruto === '') return;
-        window._posicaoRotaPorTelefone[c.phone] = bruto;
-      });
-    }catch(ePos){
-      console.warn('Posição de rota indisponível (coluna "posição_rota" pode não existir na tabela clientes):', ePos);
-    }
+    window._telefonesRotaAtiva = new Set();
+    (clientes || []).forEach(c => {
+      if(!c.phone) return;
+      window._telefonesRotaAtiva.add(c.phone);
+      if(c.posicao_na_rota != null && c.posicao_na_rota !== ''){
+        window._posicaoRotaPorTelefone[c.phone] = c.posicao_na_rota;
+      }
+    });
 
     // ícone/cor do selinho de status, conforme a etapa do pedido de hoje
     // "Entregue" não entra aqui de propósito: pedido entregue volta ao visual normal
@@ -914,20 +995,32 @@ async function carregarPedidos(){
   lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:30px;">carregando...</div>';
 
   try{
-    const { data, error } = await sb.from('pedidos')
+    let { data, error } = await sb.from('pedidos')
       .select('*')
       .in('status', STATUS_PENDENTES_ENTREGA)
       .order('created_at', { ascending: true });
     if(error) throw error;
 
-    await atualizarMarcadoresClientes(); // popula window._posicaoRotaPorTelefone antes de ordenar a lista
+    await atualizarMarcadoresClientes(); // popula window._posicaoRotaPorTelefone e window._telefonesRotaAtiva antes de ordenar a lista
 
-    if(!data || data.length === 0){
-      lista.innerHTML = '<div id="vazio"><div class="e">📦</div>Nenhum pedido pronto para entrega no momento.</div>';
+    // só mostra pedidos de clientes que pertencem à rota ativa de hoje
+    const telefonesDaRota = window._telefonesRotaAtiva || new Set();
+    let dataFiltrada = rotaAtivaId ? data.filter(p => telefonesDaRota.has(p.customer_phone)) : [];
+
+    if(!rotaAtivaId){
+      lista.innerHTML = '<div id="vazio"><div class="e">🗺️</div>Escolha uma rota no topo da tela para começar.</div>';
       count.textContent = '0 pedidos';
       badge.classList.add('oculto');
       return;
     }
+
+    if(dataFiltrada.length === 0){
+      lista.innerHTML = '<div id="vazio"><div class="e">📦</div>Nenhum pedido pronto para entrega nessa rota no momento.</div>';
+      count.textContent = '0 pedidos';
+      badge.classList.add('oculto');
+      return;
+    }
+    data = dataFiltrada;
 
     // ordena pela posição da rota (texto puro na tabela); o "-" abaixo já converte na hora
     // da comparação sozinho, então "2" e "10" ordenam certo sem precisar tratar nada.
@@ -968,11 +1061,13 @@ async function carregarPedidos(){
 }
 
 /* ===== INIT ===== */
-window.addEventListener('load', ()=>{
+window.addEventListener('load', async ()=>{
   atualizarBtnRecenter();
   iniciarGPS();
+  await carregarRotasHoje(); // decide/pergunta a rota de hoje antes de carregar clientes e pedidos
   carregarPedidos(); // já deixa os 👤 dos clientes plotados no mapa sem precisar abrir o painel
   setInterval(carregarPedidos, 20000); // mantém badge e marcadores atualizados
+  setInterval(carregarRotasHoje, 5*60000); // reavalia rota do dia a cada 5min (troca de dia, mudança no admin, etc)
 });
 </script>
 </body>

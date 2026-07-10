@@ -43,7 +43,7 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 /* ===== VELOCÍMETRO LASER / HUD ===== */
 :root{ --laser1:#f59e0b; --laser2:#fde68a; }
 
-#velocimetro{position:fixed;left:14px;bottom:max(110px, calc(env(safe-area-inset-bottom) + 110px));z-index:35;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 50% 38%, #17171b 0%, #0a0a0c 72%);border:1px solid rgba(255,255,255,0.06);box-shadow:0 18px 38px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.03), inset 0 2px 10px rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:box-shadow 0.4s;}
+#velocimetro{position:fixed;left:14px;bottom:max(190px, calc(env(safe-area-inset-bottom) + 190px));z-index:35;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 50% 38%, #17171b 0%, #0a0a0c 72%);border:1px solid rgba(255,255,255,0.06);box-shadow:0 18px 38px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.03), inset 0 2px 10px rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:box-shadow 0.4s;}
 #velocimetro::before{content:'';position:absolute;inset:10px;border-radius:50%;background:radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--laser1) 22%, transparent), transparent 70%);pointer-events:none;transition:background 0.4s;z-index:1;}
 #velocimetro::after{content:'';position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,0.04), 0 0 26px -4px color-mix(in srgb, var(--laser1) 65%, transparent);pointer-events:none;transition:box-shadow 0.4s;z-index:3;}
 
@@ -79,17 +79,20 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 .dot-live.off{background:#ef4444;animation:none;}
 @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.5);}50%{box-shadow:0 0 0 7px rgba(34,197,94,0);}}
 
-#rotaChip{position:fixed;top:max(14px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:30;background:rgba(10,10,11,0.85);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:30px;padding:8px 14px;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--text);max-width:62vw;cursor:pointer;}
-#rotaChip .bolinha{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--text3);}
-#rotaChip .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#rotaChip .seta{color:var(--text3);font-size:9px;flex-shrink:0;}
-#rotaChip.sem-rota{color:var(--text3);font-weight:700;}
+/* ===== PAINEL ÚNICO COM ABAS: Pedidos / Rotas / Local (tudo que era chip+painéis soltos agora vive aqui) ===== */
+.painel-tabs{display:flex;gap:6px;padding:10px 14px 4px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:transparent;border:none;border-radius:12px;padding:9px 4px;font-size:12.5px;font-weight:800;color:var(--text3);cursor:pointer;position:relative;}
+.tab-btn.ativa{background:rgba(245,158,11,0.12);color:var(--amber);}
+.tab-badge{position:absolute;top:2px;right:10px;background:#ef4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+.tab-badge.oculto{display:none;}
 
-#overlayRotas{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:59;opacity:0;pointer-events:none;transition:opacity 0.25s;}
-#overlayRotas.aberto{opacity:1;pointer-events:auto;}
-#painelRotas{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface);border-top:1px solid var(--border);border-radius:24px 24px 0 0;max-height:70vh;display:flex;flex-direction:column;transform:translateY(100%);transition:transform 0.32s cubic-bezier(.2,.9,.3,1);box-shadow:0 -10px 40px rgba(0,0,0,0.5);}
-#painelRotas.aberto{transform:translateY(0);}
-#painelRotas .painel-body{overflow-y:auto;padding:6px 16px 28px;-webkit-overflow-scrolling:touch;}
+.tab-subhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.tab-subhead span:first-child{font-size:13px;font-weight:800;color:var(--text);}
+.tab-subhead .count{font-size:11px;color:var(--text3);font-weight:700;}
+
+.status-rota-atual{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:var(--text2);margin-bottom:14px;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;}
+.status-rota-atual .bolinha{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--text3);}
+
 .rota-item{display:flex;align-items:center;gap:12px;padding:14px 6px;border-bottom:1px solid var(--border);}
 .rota-item:last-child{border-bottom:none;}
 .rota-item .bolinha{width:14px;height:14px;border-radius:50%;flex-shrink:0;}
@@ -99,6 +102,24 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 .rota-item .check{font-size:18px;color:var(--text3);}
 .rota-item.ativa .check{color:var(--amber);}
 #semRotasHoje{text-align:center;color:var(--text3);font-size:12.5px;padding:30px 20px;}
+
+.grupo-rota{margin-bottom:18px;}
+.grupo-rota .cab{display:flex;align-items:center;gap:9px;padding:8px 4px;}
+.grupo-rota .cab .bolinha{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.grupo-rota .cab .nome{font-size:14px;font-weight:800;flex:1;}
+.grupo-rota .cab .qtd{font-size:11.5px;color:var(--text3);font-weight:700;}
+.grupo-rota .cliente-linha{display:flex;align-items:center;gap:10px;padding:9px 8px 9px 22px;border-bottom:1px solid var(--border);}
+.grupo-rota .cliente-linha:last-child{border-bottom:none;}
+.grupo-rota .cliente-linha .pos{width:20px;height:20px;border-radius:50%;background:#2e1f4a;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:var(--text2);flex-shrink:0;}
+.grupo-rota .cliente-linha .nome{font-size:13px;font-weight:700;color:var(--text);}
+
+.cliente-sel-linha{display:flex;align-items:center;gap:10px;padding:12px 8px;border-bottom:1px solid var(--border);cursor:pointer;}
+.cliente-sel-linha:active{background:rgba(255,255,255,0.04);}
+.cliente-sel-linha .avatar{width:38px;height:38px;border-radius:50%;background:#2e1f4a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text2);flex-shrink:0;border:2px solid transparent;}
+.cliente-sel-linha.tem-coord .avatar{border-color:var(--green, #22c55e);color:var(--green, #22c55e);}
+.cliente-sel-linha .nome{font-size:13.5px;font-weight:700;flex:1;}
+.cliente-sel-linha .ir{font-size:12px;color:var(--amber);font-weight:800;}
+.cliente-sel-linha.tem-coord .ir{color:var(--green, #22c55e);}
 
 #fab{position:fixed;width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ea580c);box-shadow:0 8px 24px rgba(234,88,12,0.45), 0 0 0 4px rgba(10,10,11,0.6);z-index:40;display:flex;align-items:center;justify-content:center;font-size:26px;cursor:grab;touch-action:none;transition:transform 0.15s;}
 #fab:active{cursor:grabbing;transform:scale(0.93);}
@@ -117,12 +138,19 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 #fecharPainel{background:rgba(255,255,255,0.06);border:none;color:var(--text2);width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 
 .painel-body{overflow-y:auto;padding:12px 16px 28px;-webkit-overflow-scrolling:touch;}
+.painel-body.oculto{display:none;}
 .pedido-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;}
 .pedido-card .top{display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;}
 .pedido-card .nome{font-weight:800;font-size:14.5px;}
 .pedido-card .total{font-weight:900;color:var(--amber);font-size:14.5px;}
 .pedido-card .itens{font-size:12px;color:var(--text3);line-height:1.5;white-space:pre-line;max-height:60px;overflow:hidden;}
 .pedido-card .status-tag{display:inline-block;margin-top:8px;font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,0.12);color:var(--amber);}
+.pedido-card .acoes-manual{display:flex;gap:8px;margin-top:10px;}
+.pedido-card .btn-acao{flex:1;border-radius:11px;padding:10px 6px;font-size:11.5px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;-webkit-tap-highlight-color:transparent;}
+.pedido-card .btn-acao.entregar{background:rgba(34,197,94,0.14);color:var(--green);border:1px solid rgba(34,197,94,0.35);}
+.pedido-card .btn-acao.ausente{background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);}
+.pedido-card .btn-acao:active{transform:scale(0.96);}
+.pedido-card .btn-acao:disabled{opacity:0.55;}
 
 #vazio{text-align:center;color:var(--text3);font-size:13px;padding:50px 20px;}
 #vazio .e{font-size:38px;margin-bottom:10px;}
@@ -136,22 +164,7 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 
 <div id="gpsBadge"><div class="dot-live" id="dotGps"></div><span id="gpsTexto">Buscando GPS...</span></div>
 
-<div id="rotaChip" class="sem-rota"><div class="bolinha"></div><span class="txt">carregando rota...</span><span class="seta">▾</span></div>
-
 <div id="btnRecenter">🧭</div>
-
-<div id="overlayRotas"></div>
-<div id="painelRotas">
-  <div class="painel-handle"></div>
-  <div class="painel-header">
-    <div>
-      <h2>Escolher rota</h2>
-      <div class="count" id="painelRotasCount">carregando...</div>
-    </div>
-    <button id="fecharPainelRotas">✕</button>
-  </div>
-  <div class="painel-body" id="listaRotas"></div>
-</div>
 
 <div id="velocimetro">
   <svg class="vel-ring" viewBox="0 0 140 140">
@@ -183,13 +196,46 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 <div id="painel">
   <div class="painel-handle"></div>
   <div class="painel-header">
-    <div>
-      <h2>Pedidos para entrega</h2>
-      <div class="count" id="painelCount">carregando...</div>
-    </div>
+    <h2>🍗 O Rei da Coxinha</h2>
     <button id="fecharPainel">✕</button>
   </div>
-  <div class="painel-body" id="listaPedidos"></div>
+
+  <div class="painel-tabs">
+    <button class="tab-btn ativa" data-tab="tabPedidos">📦 Pedidos<span class="tab-badge oculto" id="tabBadgePedidos">0</span></button>
+    <button class="tab-btn" data-tab="tabRotas">🗺️ Rotas</button>
+    <button class="tab-btn" data-tab="tabLocal">📍 Local</button>
+  </div>
+
+  <div class="painel-body" id="tabPedidos">
+    <div class="status-rota-atual" id="statusRotaAtual"><div class="bolinha"></div><span>carregando rota...</span></div>
+    <div class="tab-subhead">
+      <span>Pedidos para entrega</span>
+      <span class="count" id="painelCount">carregando...</span>
+    </div>
+    <div id="listaPedidos"></div>
+  </div>
+
+  <div class="painel-body oculto" id="tabRotas">
+    <div class="tab-subhead">
+      <span>Rotas de hoje</span>
+      <span class="count" id="painelRotasCount">carregando...</span>
+    </div>
+    <div id="listaRotas"></div>
+
+    <div class="tab-subhead" style="margin-top:24px;">
+      <span>Todas as rotas e clientes</span>
+      <span class="count" id="painelTodasRotasCount">carregando...</span>
+    </div>
+    <div id="listaTodasRotas"></div>
+  </div>
+
+  <div class="painel-body oculto" id="tabLocal">
+    <div class="tab-subhead">
+      <span>Salvar localização</span>
+      <span class="count" id="painelSalvarCoordCount">toque num cliente sem coordenada</span>
+    </div>
+    <div id="listaSalvarCoord"></div>
+  </div>
 </div>
 
 <script>
@@ -315,12 +361,14 @@ function initMap(lat, lng){
     seguindoCamera = false;
     atualizarBtnRecenter();
     clearTimeout(timeoutVoltarSeguir);
-    if(map.getPitch() !== 0){
-      map.easeTo({ pitch: 0, zoom: Math.min(map.getZoom(), 15.5), padding: { top:0, bottom:0, left:0, right:0 }, duration: 400 });
-    }
+    // não mexe na câmera aqui: animar pitch/zoom no meio do gesto do usuário é o que travava o arraste
   }
 
   function agendarVoltaAutomatica(){
+    // achata a inclinação só depois que o usuário soltou o dedo (nunca no meio do gesto)
+    if(map.getPitch() !== 0){
+      map.easeTo({ pitch: 0, zoom: Math.min(map.getZoom(), 15.5), padding: { top:0, bottom:0, left:0, right:0 }, duration: 400 });
+    }
     if(seguindoCamera) return;
     clearTimeout(timeoutVoltarSeguir);
     timeoutVoltarSeguir = setTimeout(()=>{
@@ -416,6 +464,7 @@ function iniciarGPS(){
     document.getElementById('gpsTexto').textContent = 'GPS ativo • ±' + Math.round(accuracy) + 'm';
     enviarGPS(latitude, longitude, accuracy, speed, heading);
     verificarGeofenceFabrica(latitude, longitude);
+    verificarGeofenceClientes(latitude, longitude);
     atualizarCorTrajetoria(); // recorta vermelho/verde na posição atual, sem precisar buscar rota de novo
   }, (err)=>{
     document.getElementById('dotGps').classList.add('off');
@@ -479,7 +528,10 @@ async function enviarGPS(lat, lon, accuracy, speed, heading){
   }
 }
 
-/* ===== GEOFENCE DA FÁBRICA: entrou no raio de 50m = coleta automática ===== */
+/* ===== GEOFENCE DA FÁBRICA: entrou no raio de 50m =====
+   Se a rota ativa tem pedido "Em espera" pendente: coleta automática (vira "A caminho").
+   Se a rota ativa não tem mais nada pendente (tudo entregue): é a volta pra fábrica, conclui a rota
+   e libera automaticamente a próxima da fila. */
 const RAIO_FABRICA_METROS = 50;
 let _dentroFabrica = false; // controla a transição fora->dentro, pra disparar só uma vez por chegada
 
@@ -488,24 +540,56 @@ function verificarGeofenceFabrica(lat, lng){
   const estaDentro = dist <= RAIO_FABRICA_METROS;
 
   if(estaDentro && !_dentroFabrica){
-    // acabou de entrar no raio da fábrica: dispara a coleta automática
     _dentroFabrica = true;
-    autoColetarPedidos();
+    tratarChegadaFabrica();
   } else if(!estaDentro && _dentroFabrica){
-    // saiu do raio: rearma pra próxima chegada
     _dentroFabrica = false;
   }
 }
 
-// pega tudo que estiver "Em espera" (ADM já confirmou, aguardando entregador) e move pra "A caminho"
+async function tratarChegadaFabrica(){
+  if(!rotaAtivaId) return;
+  try{
+    const telefones = Array.from(window._telefonesRotaAtiva || []);
+    if(telefones.length === 0) return;
+
+    const inicioHoje = new Date();
+    inicioHoje.setHours(0,0,0,0);
+
+    const { data: pendentes, error } = await sb.from('pedidos')
+      .select('id,status')
+      .in('customer_phone', telefones)
+      .neq('status', 'Entregue')
+      .gte('created_at', inicioHoje.toISOString());
+    if(error) throw error;
+
+    const temEmEspera = (pendentes || []).some(p => p.status === 'Em espera');
+
+    if(temEmEspera){
+      await autoColetarPedidos();       // pegou os pedidos: "Em espera" -> "A caminho"
+      await garantirExecucaoIniciada(); // marca a rota como iniciada hoje
+    }else if((pendentes || []).length === 0){
+      await concluirRotaAtiva();        // voltou com tudo entregue: encerra e libera a próxima
+    }
+    // se ainda tem "A caminho" pendente e nada "Em espera", o entregador só está passando; não faz nada
+  }catch(e){
+    console.error('Erro ao tratar chegada na fábrica:', e);
+  }
+}
+
+// pega tudo que estiver "Em espera" da rota ativa e move pra "A caminho"
 async function autoColetarPedidos(){
   try{
+    const telefones = Array.from(window._telefonesRotaAtiva || []);
+    if(telefones.length === 0) return;
+
     const inicioHoje = new Date();
     inicioHoje.setHours(0,0,0,0);
 
     const { data, error } = await sb.from('pedidos')
       .update({ status: 'A caminho' })
       .eq('status', 'Em espera')
+      .in('customer_phone', telefones)
       .gte('created_at', inicioHoje.toISOString())
       .select('id');
     if(error) throw error;
@@ -516,6 +600,49 @@ async function autoColetarPedidos(){
     }
   }catch(e){
     console.error('Erro na coleta automática (geofence fábrica):', e);
+  }
+}
+
+/* ===== GEOFENCE DO CLIENTE: entrou no raio de 20m = entrega confirmada automaticamente ===== */
+const RAIO_CLIENTE_METROS = 20;
+let _dentroClientes = {}; // phone -> bool, mesma lógica de transição fora->dentro da fábrica
+
+function verificarGeofenceClientes(lat, lng){
+  if(!rotaAtivaId) return;
+  const clientes = window._clientesAtivosCoords || [];
+  clientes.forEach(c => {
+    const dist = distanciaMetros(lat, lng, c.lat, c.lng);
+    const estaDentro = dist <= RAIO_CLIENTE_METROS;
+    const jaEstava = _dentroClientes[c.phone] || false;
+
+    if(estaDentro && !jaEstava){
+      _dentroClientes[c.phone] = true;
+      confirmarEntregaAutomatica(c.phone);
+    }else if(!estaDentro && jaEstava){
+      _dentroClientes[c.phone] = false;
+    }
+  });
+}
+
+async function confirmarEntregaAutomatica(phone){
+  try{
+    const inicioHoje = new Date();
+    inicioHoje.setHours(0,0,0,0);
+
+    const { data, error } = await sb.from('pedidos')
+      .update({ status: 'Entregue' })
+      .eq('customer_phone', phone)
+      .eq('status', 'A caminho')
+      .gte('created_at', inicioHoje.toISOString())
+      .select('id');
+    if(error) throw error;
+
+    if(data && data.length){
+      console.log('Entrega automática confirmada para ' + phone);
+      carregarPedidos();
+    }
+  }catch(e){
+    console.error('Erro na confirmação automática de entrega:', e);
   }
 }
 
@@ -558,13 +685,16 @@ function moverDrag(x, y){
 }
 function soltarDrag(){
   dragging = false;
-  if(!moved) abrirPainel();
 }
 
 fab.addEventListener('pointerdown', (e)=>{ fab.setPointerCapture(e.pointerId); comecarDrag(e.clientX, e.clientY); });
 fab.addEventListener('pointermove', (e)=>{ moverDrag(e.clientX, e.clientY); });
 fab.addEventListener('pointerup', soltarDrag);
 fab.addEventListener('pointercancel', soltarDrag);
+// o 'click' nativo é quem decide se abre o painel: é mais confiável que o pointerup
+// pra toque rápido em alguns WebViews Android, que às vezes "engolem" o pointerup
+// de um toque muito curto. 'moved' já reflete se rolou arraste de verdade (>8px).
+fab.addEventListener('click', ()=>{ if(!moved) abrirPainel(); });
 
 // mostra o erro direto na tela (útil no celular, sem precisar abrir console)
 function mostrarErroDebug(msg){
@@ -754,62 +884,93 @@ const STATUS_ATIVOS = ['Em produção', 'Em espera', 'A caminho'];
 // dentre os ativos, esses já foram confirmados pelo ADM e estão prontos/indo pra entrega (podem virar "próximo")
 const STATUS_PENDENTES_ENTREGA = ['Em espera', 'A caminho'];
 
-/* ===== ROTAS DO DIA ===== */
-let rotaAtivaId = localStorage.getItem('rotaAtivaId') || null;
-let _rotasHoje = []; // cache das rotas válidas pra hoje (dia da semana + ativa=true)
+/* ===== ROTAS DO DIA (automático, sequencial) =====
+   Schema real (igual ao adm.html): tabela "rotas" (id, nome, cor, horario_saida, dias_semana "1,2,3"),
+   e clientes.rota guarda "xxxx-pos,xxxx-pos" (xxxx = 4 primeiros chars do id da rota).
+   Cada rota só libera quando a anterior do dia (por horário) estiver concluída. Não tem seleção manual. */
+let rotaAtivaId = null;
+let _rotasHoje = [];       // rotas de hoje, ordenadas por horário
+let _execucoesHoje = {};   // rota_id -> {status, iniciada_em, concluida_em}
+let _proximaRotaInfo = null; // { nome, horario } quando ainda não é hora da próxima
 
-function _diaSemanaHoje(){
-  return new Date().getDay(); // 0=domingo ... 6=sábado, igual ao dias_semana do banco
+function _diaSemanaHoje(){ return new Date().getDay(); } // 0=domingo ... 6=sábado
+function _dataHojeStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function _horaAgoraStr(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 
 async function carregarRotasHoje(){
-  const chip = document.getElementById('rotaChip');
   try{
     const dia = _diaSemanaHoje();
-    const { data, error } = await sb.from('rotas').select('id,nome,cor,horario_saida,dias_semana,ativa').eq('ativa', true);
-    if(error) throw error;
+    const hoje = _dataHojeStr();
 
-    _rotasHoje = (data || []).filter(r => Array.isArray(r.dias_semana) && r.dias_semana.includes(dia))
-      .sort((a,b) => (a.horario_saida || '').localeCompare(b.horario_saida || ''));
+    const [{ data: rotas, error: errR }, { data: execs, error: errE }] = await Promise.all([
+      sb.from('rotas').select('id,nome,cor,horario_saida,dias_semana').eq('ativa', true),
+      sb.from('execucoes_rota').select('rota_id,status,iniciada_em,concluida_em').eq('data', hoje)
+    ]);
+    if(errR) throw errR;
+    if(errE) console.warn('execucoes_rota indisponível (crie a tabela — veja migração):', errE);
 
-    if(_rotasHoje.length === 0){
-      rotaAtivaId = null;
-      localStorage.removeItem('rotaAtivaId');
-      chip.className = 'sem-rota';
-      chip.querySelector('.txt').textContent = 'sem rota hoje';
-      chip.querySelector('.bolinha').style.background = 'var(--text3)';
-      return;
+    _execucoesHoje = {};
+    (execs || []).forEach(e => { _execucoesHoje[e.rota_id] = e; });
+
+    _rotasHoje = (rotas || [])
+      .filter(r => (r.dias_semana || '').split(',').map(Number).includes(dia))
+      .sort((a,b) => (a.horario_saida || '99:99').localeCompare(b.horario_saida || '99:99'));
+
+    const anterior = rotaAtivaId;
+    rotaAtivaId = null;
+    _proximaRotaInfo = null;
+    const agora = _horaAgoraStr();
+
+    for(const r of _rotasHoje){
+      const exec = _execucoesHoje[r.id];
+      if(exec && exec.status === 'concluida') continue; // essa já terminou hoje, passa pra próxima
+      if(r.horario_saida && agora < r.horario_saida.slice(0,5)){
+        _proximaRotaInfo = { nome: r.nome, horario: r.horario_saida.slice(0,5) };
+        break; // ainda não chegou a hora dessa rota (a primeira não concluída na fila)
+      }
+      rotaAtivaId = r.id;
+      break;
     }
 
-    // valida se a rota salva ainda existe entre as de hoje; senão, escolhe/pergunta
-    const salvaAindaValida = _rotasHoje.find(r => r.id === rotaAtivaId);
-    if(salvaAindaValida){
-      selecionarRota(salvaAindaValida, false);
-    }else if(_rotasHoje.length === 1){
-      selecionarRota(_rotasHoje[0], false);
-    }else{
-      chip.className = '';
-      chip.querySelector('.txt').textContent = 'escolher rota';
-      chip.querySelector('.bolinha').style.background = 'var(--text3)';
-      abrirPainelRotas();
-    }
+    _atualizarChip();
+    if(anterior !== rotaAtivaId) carregarPedidos(); // rota mudou: recarrega marcadores e painel
   }catch(e){
     console.error('Erro ao carregar rotas:', e);
     mostrarErroDebug('Rotas: ' + (e.message || JSON.stringify(e)));
   }
 }
 
-function selecionarRota(rota, atualizarDepois){
-  rotaAtivaId = rota.id;
-  localStorage.setItem('rotaAtivaId', rota.id);
-  const chip = document.getElementById('rotaChip');
-  chip.className = '';
-  chip.querySelector('.txt').textContent = rota.nome;
-  chip.querySelector('.bolinha').style.background = rota.cor || 'var(--amber)';
-  if(atualizarDepois) carregarPedidos();
+function _atualizarChip(){
+  const chip = document.getElementById('statusRotaAtual');
+  const txt = chip.querySelector('span');
+  const bolinha = chip.querySelector('.bolinha');
+
+  if(rotaAtivaId){
+    const rota = _rotasHoje.find(r => r.id === rotaAtivaId);
+    txt.textContent = rota.nome + ' • 🔵 em andamento';
+    bolinha.style.background = rota.cor || 'var(--amber)';
+  }else if(_proximaRotaInfo){
+    txt.textContent = 'próxima: ' + _proximaRotaInfo.nome + ' às ' + _proximaRotaInfo.horario;
+    bolinha.style.background = 'var(--text3)';
+  }else if(_rotasHoje.length > 0){
+    txt.textContent = 'rotas de hoje concluídas ✅';
+    bolinha.style.background = 'var(--green)';
+  }else{
+    txt.textContent = 'sem rota hoje';
+    bolinha.style.background = 'var(--text3)';
+  }
+
+  renderRotasHoje(); // mantém a aba "Rotas" sempre em dia, mesmo fechada
 }
 
-function abrirPainelRotas(){
+// lista as rotas de hoje (aba "Rotas"); tudo automático, é só acompanhamento, sem poder escolher
+function renderRotasHoje(){
   const lista = document.getElementById('listaRotas');
   const count = document.getElementById('painelRotasCount');
   lista.innerHTML = '';
@@ -820,34 +981,157 @@ function abrirPainelRotas(){
   }else{
     count.textContent = _rotasHoje.length + (_rotasHoje.length === 1 ? ' rota hoje' : ' rotas hoje');
     _rotasHoje.forEach(r => {
+      const exec = _execucoesHoje[r.id];
+      const status = r.id === rotaAtivaId ? '🔵 em andamento'
+        : (exec && exec.status === 'concluida') ? '✅ concluída'
+        : '⏳ aguardando';
       const div = document.createElement('div');
       div.className = 'rota-item' + (r.id === rotaAtivaId ? ' ativa' : '');
       div.innerHTML = `
         <div class="bolinha" style="background:${r.cor || '#f59e0b'}"></div>
         <div class="info">
           <div class="nome">${r.nome}</div>
-          <div class="horario">${r.horario_saida ? 'saída ' + r.horario_saida.slice(0,5) : 'sem horário definido'}</div>
+          <div class="horario">${r.horario_saida ? 'saída ' + r.horario_saida.slice(0,5) : 'sem horário definido'} • ${status}</div>
         </div>
-        <div class="check">${r.id === rotaAtivaId ? '✓' : ''}</div>
       `;
-      div.onclick = () => {
-        selecionarRota(r, true);
-        fecharPainelRotas();
-      };
       lista.appendChild(div);
     });
   }
+}
 
-  document.getElementById('painelRotas').classList.add('aberto');
-  document.getElementById('overlayRotas').classList.add('aberto');
+/* ===== VER TODAS AS ROTAS E CLIENTES (visão geral, organizada por rota) ===== */
+async function carregarTodasRotas(){
+  const lista = document.getElementById('listaTodasRotas');
+  const count = document.getElementById('painelTodasRotasCount');
+  lista.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Carregando...</div>';
+
+  try{
+    const [{ data: rotas, error: errR }, { data: clientes, error: errC }] = await Promise.all([
+      sb.from('rotas').select('id,nome,cor,horario_saida,dias_semana').eq('ativa', true).order('nome'),
+      sb.from('clientes').select('phone,name,rota_id,posicao_na_rota').not('rota_id', 'is', null)
+    ]);
+    if(errR) throw errR;
+    if(errC) throw errC;
+
+    const clientesPorRota = {};
+    (clientes || []).forEach(c => {
+      if(!clientesPorRota[c.rota_id]) clientesPorRota[c.rota_id] = [];
+      clientesPorRota[c.rota_id].push(c);
+    });
+    Object.values(clientesPorRota).forEach(arr => arr.sort((a,b) => (a.posicao_na_rota ?? 999) - (b.posicao_na_rota ?? 999)));
+
+    if(!rotas || rotas.length === 0){
+      lista.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Nenhuma rota cadastrada.</div>';
+      count.textContent = '0 rotas';
+      return;
+    }
+
+    count.textContent = rotas.length + (rotas.length === 1 ? ' rota' : ' rotas') + ' • ' + (clientes || []).length + ' clientes';
+
+    lista.innerHTML = rotas.map(r => {
+      const cli = clientesPorRota[r.id] || [];
+      return `<div class="grupo-rota">
+        <div class="cab">
+          <div class="bolinha" style="background:${r.cor || '#f59e0b'}"></div>
+          <div class="nome">Rota ${r.nome}</div>
+          <div class="qtd">${r.horario_saida ? r.horario_saida.slice(0,5) + ' • ' : ''}${cli.length} cliente${cli.length===1?'':'s'}</div>
+        </div>
+        ${cli.length === 0
+          ? '<div style="padding:6px 8px 6px 22px;font-size:12px;color:var(--text3);">nenhum cliente nessa rota ainda</div>'
+          : cli.map(c => `<div class="cliente-linha"><div class="pos">${c.posicao_na_rota ?? '·'}</div><div class="nome">${c.name}</div></div>`).join('')}
+      </div>`;
+    }).join('');
+  }catch(e){
+    lista.innerHTML = '<div style="text-align:center;padding:30px;color:#ef4444;font-size:12.5px;">Erro ao carregar: ' + (e.message||'') + '</div>';
+    console.error(e);
+  }
 }
-function fecharPainelRotas(){
-  document.getElementById('painelRotas').classList.remove('aberto');
-  document.getElementById('overlayRotas').classList.remove('aberto');
+
+/* ===== SALVAR/ATUALIZAR COORDENADA: pega a posição atual do GPS e grava no cliente selecionado.
+   Quem já tem localização aparece em verde (pra atualizar); quem não tem, aparece normal (pra salvar pela primeira vez). ===== */
+async function carregarSalvarCoord(){
+  const lista = document.getElementById('listaSalvarCoord');
+  lista.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Carregando...</div>';
+
+  try{
+    const { data: clientes, error } = await sb.from('clientes').select('phone,name,coordenadas').order('name');
+    if(error) throw error;
+
+    if(!clientes || clientes.length === 0){
+      lista.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px;">Nenhum cliente cadastrado.</div>';
+      return;
+    }
+
+    // sem coordenada primeiro, quem já tem depois (mas todo mundo aparece)
+    const ordenados = [...clientes].sort((a,b) => {
+      const temA = a.coordenadas && a.coordenadas.trim() ? 1 : 0;
+      const temB = b.coordenadas && b.coordenadas.trim() ? 1 : 0;
+      if(temA !== temB) return temA - temB;
+      return a.name.localeCompare(b.name);
+    });
+
+    lista.innerHTML = ordenados.map(c => {
+      const ini = c.name.trim().slice(0,2).toUpperCase();
+      const temCoord = c.coordenadas && c.coordenadas.trim();
+      return `<div class="cliente-sel-linha ${temCoord ? 'tem-coord' : ''}" onclick="confirmarSalvarCoord('${c.phone}','${c.name.replace(/'/g,"\\'")}',${temCoord ? 'true' : 'false'})">
+        <div class="avatar">${ini}</div>
+        <div class="nome">${c.name}</div>
+        <div class="ir">${temCoord ? '📍 atualizar' : '📍 salvar aqui'}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    lista.innerHTML = '<div style="text-align:center;padding:30px;color:#ef4444;font-size:12.5px;">Erro ao carregar: ' + (e.message||'') + '</div>';
+    console.error(e);
+  }
 }
-document.getElementById('rotaChip').onclick = abrirPainelRotas;
-document.getElementById('fecharPainelRotas').onclick = fecharPainelRotas;
-document.getElementById('overlayRotas').onclick = fecharPainelRotas;
+
+async function confirmarSalvarCoord(phone, nome, jaTinhaCoord){
+  if(!_ultimaPosicaoValida){
+    alert('Ainda não peguei sua posição de GPS. Espera o sinal ficar ativo e tenta de novo.');
+    return;
+  }
+  const pergunta = jaTinhaCoord
+    ? 'Esse cliente já tem localização salva. Atualizar para sua posição atual, ' + nome + '?'
+    : 'Salvar sua posição atual como o endereço de ' + nome + '?';
+  if(!confirm(pergunta)) return;
+
+  try{
+    const coordStr = _ultimaPosicaoValida.lat + ', ' + _ultimaPosicaoValida.lng;
+    const { error } = await sb.from('clientes').update({ coordenadas: coordStr }).eq('phone', phone);
+    if(error) throw error;
+    navigator.vibrate && navigator.vibrate(40);
+    carregarSalvarCoord(); // atualiza a lista na hora (avatar vira verde)
+    carregarPedidos(); // se esse cliente for da rota ativa, já aparece no mapa
+  }catch(e){
+    alert('Erro ao salvar: ' + (e.message || 'tenta de novo'));
+    console.error(e);
+  }
+}
+
+async function garantirExecucaoIniciada(){
+  if(!rotaAtivaId) return;
+  const hoje = _dataHojeStr();
+  if(_execucoesHoje[rotaAtivaId]) return; // já existe, não sobrescreve iniciada_em
+  try{
+    const { error } = await sb.from('execucoes_rota')
+      .upsert({ rota_id: rotaAtivaId, data: hoje, status: 'em_andamento', iniciada_em: new Date().toISOString() },
+              { onConflict: 'rota_id,data' });
+    if(error) throw error;
+    _execucoesHoje[rotaAtivaId] = { rota_id: rotaAtivaId, status: 'em_andamento' };
+  }catch(e){ console.warn('Erro ao marcar início da rota:', e); }
+}
+
+async function concluirRotaAtiva(){
+  if(!rotaAtivaId) return;
+  const hoje = _dataHojeStr();
+  try{
+    const { error } = await sb.from('execucoes_rota')
+      .update({ status: 'concluida', concluida_em: new Date().toISOString() })
+      .eq('rota_id', rotaAtivaId).eq('data', hoje);
+    if(error) throw error;
+  }catch(e){ console.warn('Erro ao concluir rota:', e); }
+  await carregarRotasHoje(); // libera automaticamente a próxima rota da fila, se já for hora
+}
 
 async function atualizarMarcadoresClientes(){
   if(!map) return;
@@ -861,6 +1145,7 @@ async function atualizarMarcadoresClientes(){
       limparMarcadoresClientes();
       window._posicaoRotaPorTelefone = {};
       window._telefonesRotaAtiva = new Set();
+      window._clientesAtivosCoords = [];
       return;
     }
 
@@ -885,16 +1170,17 @@ async function atualizarMarcadoresClientes(){
       }
     });
 
-    // mapa telefone -> posição na rota (coluna posicao_na_rota, já vinda no select acima)
+    // mapa telefone -> posição na rota (coluna posicao_na_rota)
     // e conjunto de telefones que pertencem à rota ativa, pra filtrar o painel de pedidos
     window._posicaoRotaPorTelefone = {};
     window._telefonesRotaAtiva = new Set();
-    (clientes || []).forEach(c => {
+    window._clientesAtivosCoords = []; // pra geofence de 20m (confirmação automática de entrega)
+    clientes.forEach(c => {
       if(!c.phone) return;
       window._telefonesRotaAtiva.add(c.phone);
-      if(c.posicao_na_rota != null && c.posicao_na_rota !== ''){
-        window._posicaoRotaPorTelefone[c.phone] = c.posicao_na_rota;
-      }
+      if(c.posicao_na_rota != null) window._posicaoRotaPorTelefone[c.phone] = c.posicao_na_rota;
+      const coord = parseCoordenadas(c.coordenadas);
+      if(coord) window._clientesAtivosCoords.push({ phone: c.phone, lat: coord.lat, lng: coord.lng });
     });
 
     // ícone/cor do selinho de status, conforme a etapa do pedido de hoje
@@ -972,6 +1258,67 @@ async function atualizarMarcadoresClientes(){
   }
 }
 
+/* ===== AÇÕES MANUAIS: confirmar entrega / cliente ausente =====
+   Reserva pro automático (geofence) falhar: GPS ruim, cliente não tava em casa
+   na hora, celular sem sinal etc. Sempre filtra por status='A caminho' na hora
+   do update, então mesmo clicando duas vezes ou o geofence disparar depois,
+   não corre risco de sobrescrever um pedido que já mudou de status. */
+async function confirmarEntregaManual(id, nome, btn){
+  if(!confirm(`Confirmar a entrega de ${nome}?`)) return;
+  btn.disabled = true;
+  const outroBtn = btn.parentElement.querySelector('.btn-acao.ausente');
+  if(outroBtn) outroBtn.disabled = true;
+  btn.textContent = 'Confirmando...';
+  try{
+    const { data, error } = await sb.from('pedidos')
+      .update({ status: 'Entregue' })
+      .eq('id', id)
+      .eq('status', 'A caminho')
+      .select('id');
+    if(error) throw error;
+    if(!data || !data.length){
+      alert('Esse pedido já mudou de status (talvez o GPS já tenha confirmado). Atualizando a lista...');
+    }else{
+      navigator.vibrate && navigator.vibrate([35,50,35]);
+    }
+    carregarPedidos();
+  }catch(e){
+    console.error('Erro ao confirmar entrega manual:', e);
+    alert('Não deu pra confirmar agora. Tenta de novo.');
+    btn.disabled = false;
+    if(outroBtn) outroBtn.disabled = false;
+    btn.textContent = '✅ Confirmar entrega';
+  }
+}
+
+async function marcarClienteAusente(id, nome, btn){
+  if(!confirm(`${nome} não estava em casa? O pedido sai da fila de entrega sem virar "Entregue".`)) return;
+  btn.disabled = true;
+  const outroBtn = btn.parentElement.querySelector('.btn-acao.entregar');
+  if(outroBtn) outroBtn.disabled = true;
+  btn.textContent = 'Marcando...';
+  try{
+    const { data, error } = await sb.from('pedidos')
+      .update({ status: 'Ausente' })
+      .eq('id', id)
+      .eq('status', 'A caminho')
+      .select('id');
+    if(error) throw error;
+    if(!data || !data.length){
+      alert('Esse pedido já mudou de status. Atualizando a lista...');
+    }else{
+      navigator.vibrate && navigator.vibrate([20,40,20,40,20]);
+    }
+    carregarPedidos();
+  }catch(e){
+    console.error('Erro ao marcar cliente ausente:', e);
+    alert('Não deu pra marcar agora. Tenta de novo.');
+    btn.disabled = false;
+    if(outroBtn) outroBtn.disabled = false;
+    btn.textContent = '🚫 Ausente';
+  }
+}
+
 /* ===== PAINEL DE PEDIDOS ===== */
 const painel = document.getElementById('painel');
 const overlay = document.getElementById('overlay');
@@ -979,6 +1326,7 @@ const overlay = document.getElementById('overlay');
 function abrirPainel(){
   painel.classList.add('aberto');
   overlay.classList.add('aberto');
+  trocarTab('tabPedidos');
   carregarPedidos();
 }
 function fecharPainel(){
@@ -988,10 +1336,30 @@ function fecharPainel(){
 document.getElementById('fecharPainel').onclick = fecharPainel;
 overlay.onclick = fecharPainel;
 
+/* ===== ABAS DO PAINEL: Pedidos / Rotas / Local — cada uma carrega os dados na hora que é aberta ===== */
+function trocarTab(tabId){
+  document.querySelectorAll('.painel-tabs .tab-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === tabId));
+  document.querySelectorAll('#painel .painel-body').forEach(el => el.classList.toggle('oculto', el.id !== tabId));
+  if(tabId === 'tabRotas'){ renderRotasHoje(); carregarTodasRotas(); }
+  else if(tabId === 'tabLocal'){ carregarSalvarCoord(); }
+}
+document.querySelectorAll('.painel-tabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => trocarTab(btn.dataset.tab));
+});
+
+document.getElementById('listaPedidos').addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('.btn-acao');
+  if(!btn || btn.disabled) return;
+  const { id, nome } = btn.dataset;
+  if(btn.classList.contains('entregar')) confirmarEntregaManual(id, nome, btn);
+  else if(btn.classList.contains('ausente')) marcarClienteAusente(id, nome, btn);
+});
+
 async function carregarPedidos(){
   const lista = document.getElementById('listaPedidos');
   const count = document.getElementById('painelCount');
   const badge = document.getElementById('fabBadge');
+  const tabBadge = document.getElementById('tabBadgePedidos');
   lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:30px;">carregando...</div>';
 
   try{
@@ -1008,9 +1376,10 @@ async function carregarPedidos(){
     let dataFiltrada = rotaAtivaId ? data.filter(p => telefonesDaRota.has(p.customer_phone)) : [];
 
     if(!rotaAtivaId){
-      lista.innerHTML = '<div id="vazio"><div class="e">🗺️</div>Escolha uma rota no topo da tela para começar.</div>';
+      lista.innerHTML = '<div id="vazio"><div class="e">🗺️</div>Nenhuma rota liberada agora. Confira a aba Rotas pra ver a fila do dia.</div>';
       count.textContent = '0 pedidos';
       badge.classList.add('oculto');
+      tabBadge.classList.add('oculto');
       return;
     }
 
@@ -1018,6 +1387,7 @@ async function carregarPedidos(){
       lista.innerHTML = '<div id="vazio"><div class="e">📦</div>Nenhum pedido pronto para entrega nessa rota no momento.</div>';
       count.textContent = '0 pedidos';
       badge.classList.add('oculto');
+      tabBadge.classList.add('oculto');
       return;
     }
     data = dataFiltrada;
@@ -1038,12 +1408,21 @@ async function carregarPedidos(){
     count.textContent = data.length + (data.length === 1 ? ' pedido' : ' pedidos');
     badge.textContent = data.length;
     badge.classList.remove('oculto');
+    tabBadge.textContent = data.length;
+    tabBadge.classList.remove('oculto');
 
     lista.innerHTML = '';
     data.forEach(p=>{
       const posicao = posicaoPorTelefone[p.customer_phone];
       const div = document.createElement('div');
       div.className = 'pedido-card';
+      const nomeSeguro = (p.customer_name || 'Cliente').replace(/"/g, '&quot;');
+      const acoesHtml = (p.status === 'A caminho') ? `
+        <div class="acoes-manual">
+          <button class="btn-acao entregar" data-id="${p.id}" data-nome="${nomeSeguro}">✅ Confirmar entrega</button>
+          <button class="btn-acao ausente" data-id="${p.id}" data-nome="${nomeSeguro}">🚫 Ausente</button>
+        </div>
+      ` : '';
       div.innerHTML = `
         <div class="top">
           <div class="nome">${posicao != null ? posicao + '. ' : ''}${p.customer_name || 'Cliente'}</div>
@@ -1051,6 +1430,7 @@ async function carregarPedidos(){
         </div>
         <div class="itens">${(p.items||'').slice(0,150)}</div>
         <span class="status-tag">${p.status}</span>
+        ${acoesHtml}
       `;
       lista.appendChild(div);
     });
@@ -1067,7 +1447,7 @@ window.addEventListener('load', async ()=>{
   await carregarRotasHoje(); // decide/pergunta a rota de hoje antes de carregar clientes e pedidos
   carregarPedidos(); // já deixa os 👤 dos clientes plotados no mapa sem precisar abrir o painel
   setInterval(carregarPedidos, 20000); // mantém badge e marcadores atualizados
-  setInterval(carregarRotasHoje, 5*60000); // reavalia rota do dia a cada 5min (troca de dia, mudança no admin, etc)
+  setInterval(carregarRotasHoje, 60000); // reavalia rota do dia a cada 1min (troca de horário, dia, mudança no admin etc)
 });
 </script>
 </body>

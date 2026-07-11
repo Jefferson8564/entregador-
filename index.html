@@ -162,9 +162,39 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 
 #vazio{text-align:center;color:var(--text3);font-size:13px;padding:50px 20px;}
 #vazio .e{font-size:38px;margin-bottom:10px;}
+/* ===== Banner de instalação do PWA (fixo embaixo da tela) ===== */
+#pwaInstallBanner{
+  position:fixed; left:12px; right:12px; bottom:12px; z-index:9999;
+  background:var(--surface); border:1px solid var(--border); border-radius:18px;
+  padding:14px; display:flex; align-items:center; gap:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.45);
+  transform:translateY(140%); transition:transform 0.35s ease;
+  padding-bottom:calc(14px + env(safe-area-inset-bottom));
+}
+#pwaInstallBanner.mostrar{transform:translateY(0);}
+#pwaInstallBanner img{width:42px;height:42px;border-radius:12px;flex-shrink:0;}
+#pwaInstallBanner .txt{flex:1;min-width:0;}
+#pwaInstallBanner .txt .t{font-size:13.5px;font-weight:700;color:var(--text);}
+#pwaInstallBanner .txt .s{font-size:11.5px;color:var(--text2);margin-top:2px;}
+#pwaInstallBanner .btns{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+#pwaInstallBanner button{border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+#pwaInstallBanner .instalar{background:linear-gradient(135deg,var(--amber),var(--orange));color:#1a0f00;padding:10px 16px;font-size:13px;}
+#pwaInstallBanner .fechar{background:transparent;color:var(--text3);font-size:20px;padding:4px 6px;line-height:1;}
 </style>
 </head>
 <body>
+
+<div id="pwaInstallBanner">
+  <img src="./icon-192.png" alt="ícone do app">
+  <div class="txt">
+    <div class="t">Instalar app do Entregador</div>
+    <div class="s">Acesso rápido, tela cheia e funciona offline</div>
+  </div>
+  <div class="btns">
+    <button class="instalar" id="btnInstalarPwa">Instalar</button>
+    <button class="fechar" id="btnFecharPwaBanner">✕</button>
+  </div>
+</div>
 
 <div id="loadingOverlay"><div class="e">🛵</div><div class="l">localizando você...</div></div>
 
@@ -1475,6 +1505,74 @@ async function carregarPedidos(){
     mostrarErroDebug('Pedidos: ' + (e.message || JSON.stringify(e)));
   }
 }
+
+/* ===== PWA: banner de instalação embaixo da tela ===== */
+(function(){
+  const CHAVE_DISPENSADO = 'pwaBannerDispensadoEm';
+  const DIAS_ATE_MOSTRAR_DE_NOVO = 7;
+
+  const banner = document.getElementById('pwaInstallBanner');
+  const btnInstalar = document.getElementById('btnInstalarPwa');
+  const btnFechar = document.getElementById('btnFecharPwaBanner');
+  let promptAdiado = null;
+
+  function jaInstalado(){
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function foiDispensadoRecentemente(){
+    const em = localStorage.getItem(CHAVE_DISPENSADO);
+    if(!em) return false;
+    const dias = (Date.now() - Number(em)) / 86400000;
+    return dias < DIAS_ATE_MOSTRAR_DE_NOVO;
+  }
+
+  function mostrarBanner(){
+    if(jaInstalado() || foiDispensadoRecentemente()) return;
+    banner.classList.add('mostrar');
+  }
+
+  function esconderBanner(){
+    banner.classList.remove('mostrar');
+  }
+
+  btnFechar.addEventListener('click', () => {
+    esconderBanner();
+    localStorage.setItem(CHAVE_DISPENSADO, String(Date.now()));
+  });
+
+  // Android/Chrome/Edge: o navegador avisa que dá pra instalar, a gente guarda o evento
+  // e mostra nosso banner embaixo (em vez da barrinha padrão do navegador)
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    promptAdiado = e;
+    mostrarBanner();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    esconderBanner();
+    promptAdiado = null;
+    localStorage.removeItem(CHAVE_DISPENSADO);
+  });
+
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+
+  btnInstalar.addEventListener('click', async () => {
+    if(promptAdiado){
+      promptAdiado.prompt();
+      await promptAdiado.userChoice;
+      promptAdiado = null;
+      esconderBanner();
+    }else if(isIos){
+      alert('Pra instalar no iPhone:\n\n1. Toque no ícone de compartilhar (□↑) na barra do Safari\n2. Escolha "Adicionar à Tela de Início"');
+    }
+  });
+
+  // iOS não dispara beforeinstallprompt, então mostra o banner com instrução manual
+  if(isIos && !jaInstalado() && !foiDispensadoRecentemente()){
+    setTimeout(mostrarBanner, 1500);
+  }
+})();
 
 /* ===== PWA: registra o service worker (cache do app + funcionamento offline) ===== */
 if('serviceWorker' in navigator){

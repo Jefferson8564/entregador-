@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>Entregador • O Rei da Coxinha 🍗</title>
 <meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rei Entregador">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet"/>
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
@@ -140,6 +147,7 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 .painel-body{overflow-y:auto;padding:12px 16px 28px;-webkit-overflow-scrolling:touch;}
 .painel-body.oculto{display:none;}
 .pedido-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;}
+.grupo-rota-pedidos .pedido-card{margin-left:6px;margin-right:2px;}
 .pedido-card .top{display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;}
 .pedido-card .nome{font-weight:800;font-size:14.5px;}
 .pedido-card .total{font-weight:900;color:var(--amber);font-size:14.5px;}
@@ -209,7 +217,7 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
   <div class="painel-body" id="tabPedidos">
     <div class="status-rota-atual" id="statusRotaAtual"><div class="bolinha"></div><span>carregando rota...</span></div>
     <div class="tab-subhead">
-      <span>Pedidos para entrega</span>
+      <span>Pedidos por rota</span>
       <span class="count" id="painelCount">carregando...</span>
     </div>
     <div id="listaPedidos"></div>
@@ -1363,81 +1371,116 @@ async function carregarPedidos(){
   lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:12px;padding:30px;">carregando...</div>';
 
   try{
-    let { data, error } = await sb.from('pedidos')
-      .select('*')
-      .in('status', STATUS_PENDENTES_ENTREGA)
-      .order('created_at', { ascending: true });
-    if(error) throw error;
+    await atualizarMarcadoresClientes(); // mantém marcadores/trajetória da rota ativa no mapa em dia
 
-    await atualizarMarcadoresClientes(); // popula window._posicaoRotaPorTelefone e window._telefonesRotaAtiva antes de ordenar a lista
-
-    // só mostra pedidos de clientes que pertencem à rota ativa de hoje
-    const telefonesDaRota = window._telefonesRotaAtiva || new Set();
-    let dataFiltrada = rotaAtivaId ? data.filter(p => telefonesDaRota.has(p.customer_phone)) : [];
-
-    if(!rotaAtivaId){
-      lista.innerHTML = '<div id="vazio"><div class="e">🗺️</div>Nenhuma rota liberada agora. Confira a aba Rotas pra ver a fila do dia.</div>';
+    if(_rotasHoje.length === 0){
+      lista.innerHTML = '<div id="vazio"><div class="e">🗺️</div>Nenhuma rota configurada para hoje.</div>';
       count.textContent = '0 pedidos';
       badge.classList.add('oculto');
       tabBadge.classList.add('oculto');
       return;
     }
 
-    if(dataFiltrada.length === 0){
-      lista.innerHTML = '<div id="vazio"><div class="e">📦</div>Nenhum pedido pronto para entrega nessa rota no momento.</div>';
-      count.textContent = '0 pedidos';
+    const idsRotasHoje = _rotasHoje.map(r => r.id);
+
+    const [{ data: clientes, error: errC }, { data: pedidos, error: errP }] = await Promise.all([
+      sb.from('clientes').select('phone,name,rota_id,posicao_na_rota').in('rota_id', idsRotasHoje),
+      sb.from('pedidos').select('*').in('status', STATUS_ATIVOS).order('created_at', { ascending: true })
+    ]);
+    if(errC) throw errC;
+    if(errP) throw errP;
+
+    // telefone -> cliente (rota + posição), pra saber de qual rota é cada pedido e em que ordem mostrar
+    const clientePorTelefone = {};
+    (clientes || []).forEach(c => { clientePorTelefone[c.phone] = c; });
+
+    // agrupa os pedidos ativos (produção/espera/caminho) pela rota do cliente
+    const pedidosPorRota = {};
+    let totalPendenteEntrega = 0;
+    (pedidos || []).forEach(p => {
+      const c = clientePorTelefone[p.customer_phone];
+      if(!c) return; // cliente sem rota atribuída hoje: não entra na lista
+      if(!pedidosPorRota[c.rota_id]) pedidosPorRota[c.rota_id] = [];
+      pedidosPorRota[c.rota_id].push({ pedido: p, posicao: c.posicao_na_rota });
+      if(STATUS_PENDENTES_ENTREGA.includes(p.status)) totalPendenteEntrega++;
+    });
+
+    // dentro de cada rota, ordena pela posição cadastrada; sem posição vai pro final por ordem de chegada
+    Object.values(pedidosPorRota).forEach(arr => arr.sort((a, b) => {
+      if(a.posicao != null && b.posicao != null) return a.posicao - b.posicao;
+      if(a.posicao != null) return -1;
+      if(b.posicao != null) return 1;
+      return new Date(a.pedido.created_at) - new Date(b.pedido.created_at);
+    }));
+
+    count.textContent = totalPendenteEntrega + (totalPendenteEntrega === 1 ? ' pedido' : ' pedidos') + ' pra entregar';
+    if(totalPendenteEntrega > 0){
+      badge.textContent = totalPendenteEntrega;
+      badge.classList.remove('oculto');
+      tabBadge.textContent = totalPendenteEntrega;
+      tabBadge.classList.remove('oculto');
+    }else{
       badge.classList.add('oculto');
       tabBadge.classList.add('oculto');
+    }
+
+    const temAlgumPedidoAtivo = Object.values(pedidosPorRota).some(arr => arr.length > 0);
+    if(!temAlgumPedidoAtivo){
+      lista.innerHTML = '<div id="vazio"><div class="e">📦</div>Nenhum pedido em produção ou em rota no momento.</div>';
       return;
     }
-    data = dataFiltrada;
 
-    // ordena pela posição da rota (texto puro na tabela); o "-" abaixo já converte na hora
-    // da comparação sozinho, então "2" e "10" ordenam certo sem precisar tratar nada.
-    // quem não tem posição vai pro final, mantendo entre si a ordem de chegada
-    const posicaoPorTelefone = window._posicaoRotaPorTelefone || {};
-    data.sort((a, b) => {
-      const posA = posicaoPorTelefone[a.customer_phone];
-      const posB = posicaoPorTelefone[b.customer_phone];
-      if(posA != null && posB != null) return posA - posB;
-      if(posA != null) return -1;
-      if(posB != null) return 1;
-      return new Date(a.created_at) - new Date(b.created_at);
-    });
+    // uma "tabelinha" por rota, na ordem do horário de saída (já vem assim em _rotasHoje)
+    lista.innerHTML = _rotasHoje.map(r => {
+      const itens = pedidosPorRota[r.id] || [];
+      if(itens.length === 0) return ''; // rota sem pedido ativo agora não aparece, pra não poluir
 
-    count.textContent = data.length + (data.length === 1 ? ' pedido' : ' pedidos');
-    badge.textContent = data.length;
-    badge.classList.remove('oculto');
-    tabBadge.textContent = data.length;
-    tabBadge.classList.remove('oculto');
+      const exec = _execucoesHoje[r.id];
+      const statusRota = r.id === rotaAtivaId ? '🔵 em andamento'
+        : (exec && exec.status === 'concluida') ? '✅ concluída'
+        : '⏳ aguardando';
 
-    lista.innerHTML = '';
-    data.forEach(p=>{
-      const posicao = posicaoPorTelefone[p.customer_phone];
-      const div = document.createElement('div');
-      div.className = 'pedido-card';
-      const nomeSeguro = (p.customer_name || 'Cliente').replace(/"/g, '&quot;');
-      const acoesHtml = (p.status === 'A caminho') ? `
-        <div class="acoes-manual">
-          <button class="btn-acao entregar" data-id="${p.id}" data-nome="${nomeSeguro}">✅ Confirmar entrega</button>
-          <button class="btn-acao ausente" data-id="${p.id}" data-nome="${nomeSeguro}">🚫 Ausente</button>
+      const cardsHtml = itens.map(({ pedido: p, posicao }) => {
+        const nomeSeguro = (p.customer_name || 'Cliente').replace(/"/g, '&quot;');
+        const acoesHtml = (p.status === 'A caminho') ? `
+          <div class="acoes-manual">
+            <button class="btn-acao entregar" data-id="${p.id}" data-nome="${nomeSeguro}">✅ Confirmar entrega</button>
+            <button class="btn-acao ausente" data-id="${p.id}" data-nome="${nomeSeguro}">🚫 Ausente</button>
+          </div>
+        ` : '';
+        return `
+          <div class="pedido-card">
+            <div class="top">
+              <div class="nome">${posicao != null ? posicao + '. ' : ''}${p.customer_name || 'Cliente'}</div>
+              <div class="total">R$ ${Number(p.total).toFixed(2)}</div>
+            </div>
+            <div class="itens">${(p.items || '').slice(0, 150)}</div>
+            <span class="status-tag">${p.status}</span>
+            ${acoesHtml}
+          </div>`;
+      }).join('');
+
+      return `<div class="grupo-rota grupo-rota-pedidos">
+        <div class="cab">
+          <div class="bolinha" style="background:${r.cor || '#f59e0b'}"></div>
+          <div class="nome">Rota ${r.nome}</div>
+          <div class="qtd">${r.horario_saida ? r.horario_saida.slice(0, 5) + ' • ' : ''}${statusRota}</div>
         </div>
-      ` : '';
-      div.innerHTML = `
-        <div class="top">
-          <div class="nome">${posicao != null ? posicao + '. ' : ''}${p.customer_name || 'Cliente'}</div>
-          <div class="total">R$ ${Number(p.total).toFixed(2)}</div>
-        </div>
-        <div class="itens">${(p.items||'').slice(0,150)}</div>
-        <span class="status-tag">${p.status}</span>
-        ${acoesHtml}
-      `;
-      lista.appendChild(div);
-    });
+        ${cardsHtml}
+      </div>`;
+    }).join('');
   }catch(e){
     console.error(e);
     lista.innerHTML = '<div id="vazio"><div class="e">⚠️</div>Erro ao carregar pedidos.</div>';
+    mostrarErroDebug('Pedidos: ' + (e.message || JSON.stringify(e)));
   }
+}
+
+/* ===== PWA: registra o service worker (cache do app + funcionamento offline) ===== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch((e) => console.warn('SW falhou:', e));
+  });
 }
 
 /* ===== INIT ===== */

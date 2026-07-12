@@ -60,7 +60,7 @@ html,body{background:var(--bg);width:100%;height:100%;overflow:hidden;color:var(
 .vel-ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);z-index:2;}
 .vel-track{fill:none;stroke:rgba(255,255,255,0.055);stroke-width:4.5;}
 .vel-ticks{fill:none;stroke:rgba(255,255,255,0.16);stroke-width:1.6;stroke-dasharray:1.4 8.2;}
-.vel-arc{fill:none;stroke:var(--laser1);stroke-width:4.5;stroke-linecap:round;stroke-dasharray:376.99;stroke-dashoffset:376.99;filter:drop-shadow(0 0 3px var(--laser1)) drop-shadow(0 0 11px var(--laser2));transition:stroke-dashoffset 0.45s cubic-bezier(.4,0,.2,1), stroke 0.4s, filter 0.4s;}
+.vel-arc{fill:none;stroke:var(--laser1);stroke-width:4.5;stroke-linecap:round;stroke-dasharray:376.99;stroke-dashoffset:376.99;filter:drop-shadow(0 0 3px var(--laser1)) drop-shadow(0 0 11px var(--laser2));transition:stroke-dashoffset 0.2s ease-out, stroke 0.4s, filter 0.4s;}
 .vel-scan{fill:none;stroke:var(--laser2);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:1.2 374.79;opacity:0.75;filter:drop-shadow(0 0 5px #fff) drop-shadow(0 0 9px var(--laser1));animation:velScan 2.6s linear infinite;transition:stroke 0.4s, filter 0.4s;}
 @keyframes velScan{ to{ stroke-dashoffset:-376.99; } }
 
@@ -459,7 +459,7 @@ function atualizarPosicao(lat, lng, heading){
       bearing: heading != null && !isNaN(heading) ? heading : map.getBearing(),
       pitch: 65,
       padding: paddingCamera(),
-      duration: 800,
+      duration: 400,
       easing: t => t
     });
   }
@@ -515,7 +515,7 @@ function iniciarGPS(){
     document.getElementById('gpsTexto').textContent = 'Sem sinal de GPS';
     atualizarVelocimetro(0);
     if(!map) initMap(FABRICA_LAT, FABRICA_LNG);
-  }, { enableHighAccuracy:true, maximumAge:4000, timeout:15000 });
+  }, { enableHighAccuracy:true, maximumAge:0, timeout:10000 });
 }
 
 /* ===== ENVIA POSIÇÃO PRO SUPABASE (alimenta o acompanhamento do cliente) ===== */
@@ -529,8 +529,8 @@ function atualizarVelocimetro(velocidadeMS){
   let kmh = (velocidadeMS != null && !isNaN(velocidadeMS) && velocidadeMS > 0) ? velocidadeMS * 3.6 : 0;
   if(kmh < 1.5) kmh = 0; // ignora ruído de GPS parado
 
-  // suaviza a leitura pra não ficar tremendo
-  velocidadeSuavizada += (kmh - velocidadeSuavizada) * 0.35;
+  // suaviza a leitura só pra tirar o tremor, mas reage rápido a acelerada/freada
+  velocidadeSuavizada += (kmh - velocidadeSuavizada) * 0.55;
   const kmhMostrado = Math.round(velocidadeSuavizada);
   if(kmh > velocidadeMaxima) velocidadeMaxima = kmh;
 
